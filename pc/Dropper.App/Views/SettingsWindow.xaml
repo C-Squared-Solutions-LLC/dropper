@@ -1,0 +1,180 @@
+<Window x:Class="Dropper.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dropper settings" Width="640" Height="760" MinWidth="540" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="/Assets/Dropper.ico"
+        Style="{StaticResource WindowStyle}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="28,22,28,28">
+            <TextBlock Text="Settings" Style="{StaticResource TitleText}" Margin="0,0,0,20"/>
+
+            <!-- Receiving -->
+            <TextBlock Text="RECEIVING" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Save received files to"/>
+                            <TextBlock x:Name="ReceiveFolderText" Style="{StaticResource SubtleText}" TextTrimming="CharacterEllipsis" Margin="0,2,12,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Style="{StaticResource SecondaryButton}" Content="Change…" Click="ChangeFolder_Click"/>
+                            <Button Style="{StaticResource GhostButton}" Content="Open" Margin="6,0,0,0" Click="OpenFolder_Click"/>
+                        </StackPanel>
+                    </Grid>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+                    <CheckBox x:Name="AutoCopyToggle" Style="{StaticResource ToggleSwitch}" Click="AutoCopy_Click">
+                        <StackPanel>
+                            <TextBlock Text="Copy received text to the clipboard"/>
+                            <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                       Text="Text and links from your phone are ready to paste right away."/>
+                        </StackPanel>
+                    </CheckBox>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+                    <CheckBox x:Name="NotifyToggle" Style="{StaticResource ToggleSwitch}" Click="Notify_Click">
+                        <TextBlock Text="Show a notification when something arrives"/>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <!-- Windows -->
+            <TextBlock Text="WINDOWS" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                <StackPanel>
+                    <CheckBox x:Name="StartupToggle" Style="{StaticResource ToggleSwitch}" Click="Startup_Click">
+                        <StackPanel>
+                            <TextBlock Text="Start Dropper when I sign in"/>
+                            <TextBlock Style="{StaticResource SubtleText}" Text="It starts quietly in the tray, ready to receive." Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </CheckBox>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+                    <CheckBox x:Name="TrayToggle" Style="{StaticResource ToggleSwitch}" Click="Tray_Click">
+                        <StackPanel>
+                            <TextBlock Text="Keep running in the tray when I close the window"/>
+                            <TextBlock Style="{StaticResource SubtleText}" Text="Otherwise closing the window quits Dropper." Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </CheckBox>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+                    <CheckBox x:Name="SendToToggle" Style="{StaticResource ToggleSwitch}" Click="SendTo_Click">
+                        <StackPanel>
+                            <TextBlock Text="Add “Dropper (phone)” to Explorer's Send to menu"/>
+                            <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                       Text="Right-click any file → Show more options → Send to → Dropper (phone)."/>
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <!-- Paired phones -->
+            <TextBlock Text="PAIRED PHONES" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                <StackPanel>
+                    <ItemsControl x:Name="DeviceList"/>
+                    <TextBlock x:Name="NoDevicesText" Style="{StaticResource SubtleText}" Text="No phones are paired yet." Visibility="Collapsed"/>
+                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="Pair_Click" AutomationProperties.Name="Pair a phone">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource GlyphText}" Text="&#xED14;" Margin="0,0,8,0"/>
+                            <TextBlock Text="Pair a phone…"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Network -->
+            <TextBlock Text="NETWORK" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="NetDot" Width="8" Height="8" VerticalAlignment="Center" Margin="0,1,8,0"/>
+                        <TextBlock x:Name="NetStatusText" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="Dropper only listens on your physical home network. VPN, Tailscale, WSL and Hyper-V adapters are ignored, and connections from outside your subnet are refused."/>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+
+                    <TextBlock Text="Network adapter" Margin="0,0,0,8"/>
+                    <StackPanel x:Name="InterfaceChoices"/>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,8,0,14"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Port"/>
+                            <TextBlock Style="{StaticResource SubtleText}" Text="Discovery always uses UDP 47823." Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <TextBox x:Name="PortBox" Grid.Column="1" Style="{StaticResource InputBox}" Width="96" Padding="8,6" MaxLength="5"
+                                 VerticalAlignment="Center"/>
+                        <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="Apply" Margin="8,0,0,0" Click="ApplyPort_Click"/>
+                    </Grid>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <TextBlock Text="Windows Firewall"/>
+                            <TextBlock x:Name="FirewallText" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Button x:Name="FirewallButton" Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="Firewall_Click" AutomationProperties.Name="Allow on local network"
+                                ToolTip="Creates inbound rules for this program that only accept your local subnet (asks for administrator approval)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphText}" Text="&#xEA18;" Margin="0,0,8,0"/>
+                                <TextBlock Text="Allow on local network…"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Security -->
+            <TextBlock Text="SECURITY" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                <StackPanel>
+                    <TextBlock Text="This PC's identity key"/>
+                    <TextBlock x:Name="KeyStorageText" Style="{StaticResource SubtleText}" Margin="0,2,0,8"/>
+                    <TextBox x:Name="FingerprintBox" IsReadOnly="True" BorderThickness="0" Background="Transparent" Padding="0"
+                             FontFamily="Cascadia Mono, Consolas" FontSize="12.5" Foreground="{DynamicResource SubtleTextBrush}"
+                             TextWrapping="Wrap"/>
+                    <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Text="Your phone pinned this key when you paired, and checks it on every connection. Phones present their own pinned key back (mutual TLS 1.3)."/>
+                    <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Text="Make a brand-new key. Every phone is unpaired and must pair again."/>
+                        <Button Grid.Column="1" Style="{StaticResource DangerButton}" Content="Reset identity…" Click="ResetIdentity_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- About -->
+            <TextBlock Text="ABOUT" Style="{StaticResource SectionText}"/>
+            <Border Style="{StaticResource Card}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="VersionText"/>
+                        <TextBlock Style="{StaticResource SubtleText}" Text="Sends files and text between this PC and your phone. No cloud, no accounts." Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="Open log folder" Click="OpenLogs_Click" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

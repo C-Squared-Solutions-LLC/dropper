@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless engine host for end-to-end tests against the Android emulator.
+       Not shipped. Listens on loopback only. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dropper.Core\Dropper.Core.csproj" />
+  </ItemGroup>
+</Project>

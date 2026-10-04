@@ -1,0 +1,19 @@
+# Build output
+build/
+app/build/
+.gradle/
+.kotlin/
+*.apk
+*.aab
+
+# Machine-specific
+local.properties
+.idea/
+*.iml
+captures/
+
+# Release signing material — never commit
+keystore/
+*.jks
+*.keystore
+keystore.properties

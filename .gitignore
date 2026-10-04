@@ -1,0 +1,18 @@
+# .NET
+pc/**/bin/
+pc/**/obj/
+*.user
+.vs/
+
+# Android / Gradle (see also android/.gitignore)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore/
+
+# Python
+__pycache__/
+
+# Release artifacts
+dist/

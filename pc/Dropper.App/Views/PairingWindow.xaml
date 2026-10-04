@@ -1,0 +1,77 @@
+<Window x:Class="Dropper.App.Views.PairingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pair a phone" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="/Assets/Dropper.ico"
+        Style="{StaticResource WindowStyle}">
+    <Grid Margin="30,26,30,28">
+
+        <!-- Step 1: QR code -->
+        <StackPanel x:Name="QrPanel">
+            <TextBlock Text="Pair your phone" Style="{StaticResource TitleText}"/>
+            <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,6,0,20" FontSize="14"
+                       Text="Open Dropper on your phone, tap “Scan QR code”, and point the camera at this code."/>
+            <Border Background="{DynamicResource QrBackgroundBrush}" CornerRadius="14" Padding="10" HorizontalAlignment="Center"
+                    BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                <Grid>
+                    <Image x:Name="QrImage" Width="272" Height="272" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                    <Border x:Name="ExpiredOverlay" Background="#E6FFFFFF" Visibility="Collapsed" CornerRadius="6">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Style="{StaticResource GlyphText}" Text="&#xE916;" FontSize="26" Foreground="#5D6275"/>
+                            <TextBlock Text="This code expired" FontWeight="SemiBold" Foreground="#191B26" Margin="0,8,0,10" HorizontalAlignment="Center"/>
+                            <Button Style="{StaticResource AccentButton}" Content="Make a new code" Click="NewCode_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+            <TextBlock x:Name="ExpiryText" Style="{StaticResource SubtleText}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
+
+            <Border CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" Padding="14,12" Margin="0,20,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource GlyphText}" Text="&#xE72E;" Foreground="{DynamicResource AccentTextBrush}"
+                               VerticalAlignment="Top" Margin="0,2,12,0"/>
+                    <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource TextBrush}"
+                               Text="The code carries this PC's public key and a one-time secret. It works once, for 3 minutes, on your local network only. Keep it to yourself."/>
+                </Grid>
+            </Border>
+            <TextBlock Style="{StaticResource CaptionText}" Margin="0,14,0,0" HorizontalAlignment="Center">
+                <Run Text="This PC's key:"/>
+                <Run x:Name="PcFingerprint" FontFamily="Cascadia Mono, Consolas"/>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Step 2: compare the code -->
+        <StackPanel x:Name="ApprovePanel" Visibility="Collapsed">
+            <TextBlock Text="Check the code" Style="{StaticResource TitleText}"/>
+            <TextBlock x:Name="ApproveDeviceText" Style="{StaticResource BodyText}" Margin="0,8,0,0"/>
+            <Border CornerRadius="14" Background="{DynamicResource AccentSoftBrush}" Padding="20,18" Margin="0,18,0,0">
+                <TextBlock x:Name="SasText" FontFamily="{StaticResource DisplayFont}" FontSize="46" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center"/>
+            </Border>
+            <TextBlock Style="{StaticResource BodyText}" Margin="0,16,0,0"
+                       Text="Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject."/>
+            <TextBlock x:Name="ApproveDetails" Style="{StaticResource CaptionText}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                <Button x:Name="RejectButton" Style="{StaticResource SecondaryButton}" Content="Reject" MinWidth="96" Click="Reject_Click"/>
+                <Button x:Name="ApproveButton" Style="{StaticResource AccentButton}" Content="Codes match · Approve" Margin="10,0,0,0" Click="Approve_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Step 3: result -->
+        <StackPanel x:Name="ResultPanel" Visibility="Collapsed">
+            <Border x:Name="ResultIconCircle" Width="60" Height="60" CornerRadius="30" Background="{DynamicResource SuccessSoftBrush}" HorizontalAlignment="Center">
+                <TextBlock x:Name="ResultGlyph" Style="{StaticResource GlyphText}" Text="&#xE73E;" FontSize="26" Foreground="{DynamicResource SuccessBrush}"/>
+            </Border>
+            <TextBlock x:Name="ResultTitle" Style="{StaticResource TitleText}" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+            <TextBlock x:Name="ResultText" Style="{StaticResource SubtleText}" FontSize="14" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,22,0,0">
+                <Button x:Name="TryAgainButton" Style="{StaticResource SecondaryButton}" Content="Try again" Click="NewCode_Click" Margin="0,0,10,0"/>
+                <Button Style="{StaticResource AccentButton}" Content="Done" MinWidth="96" Click="Done_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

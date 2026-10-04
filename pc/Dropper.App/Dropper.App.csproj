@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>Dropper</AssemblyName>
+    <RootNamespace>Dropper.App</RootNamespace>
+    <ApplicationIcon>Assets\Dropper.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyTitle>Dropper</AssemblyTitle>
+    <!-- WPF owns the windows; DPI awareness belongs in app.manifest, not the WinForms API. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <Description>Send files and text between this PC and your phone over your local network.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- WinForms is only here for the tray icon; keep its global usings out of the WPF code. -->
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dropper.Core\Dropper.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Dropper.ico" />
+  </ItemGroup>
+</Project>

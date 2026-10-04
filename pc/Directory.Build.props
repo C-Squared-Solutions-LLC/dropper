@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Version>1.0.1</Version>
+    <Product>Dropper</Product>
+    <Company>Dropper</Company>
+    <Copyright>Dropper</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- CA1416: everything here is Windows-only by design. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Dropper.Scanner" parent="zxing_CaptureTheme">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+</resources>

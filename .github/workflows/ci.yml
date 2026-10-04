@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Unit + end-to-end tests
+        run: dotnet test pc/Dropper.Tests -c Release
+
+  android-app:
+    # Windows too: gradle/verification-metadata.xml pins the Windows build-tool artifacts.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Unit tests
+        working-directory: android
+        run: ./gradlew.bat testDebugUnitTest --no-daemon
+
+  protocol-vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vectors match the Python reference
+        run: |
+          python3 tools/gen_test_vectors.py > /dev/null
+          git diff --exit-code docs/test-vectors.json

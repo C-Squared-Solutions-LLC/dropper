@@ -1,0 +1,209 @@
+<Window x:Class="Dropper.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:Dropper.App.Views"
+        Title="Dropper" Width="980" Height="820" MinWidth="720" MinHeight="620"
+        Style="{StaticResource WindowStyle}" WindowStartupLocation="CenterScreen"
+        Icon="/Assets/Dropper.ico" AllowDrop="True"
+        DragEnter="Window_DragEnter" DragOver="Window_DragOver" DragLeave="Window_DragLeave" Drop="Window_Drop">
+    <Grid Margin="28,20,28,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,16" LastChildFill="False">
+            <Image Source="{StaticResource LogoImage}" Width="30" Height="30" DockPanel.Dock="Left"/>
+            <TextBlock Text="Dropper" Style="{StaticResource TitleText}" Margin="11,0,0,1" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+            <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Settings" AutomationProperties.Name="Settings" Click="Settings_Click"/>
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="Pair_Click" AutomationProperties.Name="Pair a phone"
+                    ToolTip="Show a QR code to pair a phone">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource GlyphText}" Text="&#xED14;" Margin="0,0,8,0"/>
+                    <TextBlock Text="Pair a phone"/>
+                </StackPanel>
+            </Button>
+        </DockPanel>
+
+        <!-- Banner -->
+        <Border x:Name="Banner" Grid.Row="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,14" Visibility="Collapsed"
+                Background="{DynamicResource AccentSoftBrush}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11"
+                        Content="&#xE711;" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Click="DismissBanner_Click"/>
+                <TextBlock x:Name="BannerGlyph" Style="{StaticResource GlyphText}" Text="&#xE946;" Margin="0,0,10,0"
+                           Foreground="{DynamicResource AccentTextBrush}"/>
+                <TextBlock x:Name="BannerText" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Device card -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,0,0,16" Padding="18,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="44" Height="44" CornerRadius="22" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource GlyphText}" Text="&#xE8EA;" FontSize="20" Foreground="{DynamicResource AccentTextBrush}"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="DeviceNameText" Style="{StaticResource HeadingText}" Text="Starting…" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="{DynamicResource NeutralDotBrush}" VerticalAlignment="Center" Margin="0,1,7,0"/>
+                        <TextBlock x:Name="StatusText" Style="{StaticResource SubtleText}" TextTrimming="CharacterEllipsis" Text="Loading keys…"/>
+                    </StackPanel>
+                    <ItemsControl x:Name="DeviceChoices" Margin="0,10,0,0" Visibility="Collapsed">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border x:Name="SecureBadge" CornerRadius="11" Background="{DynamicResource SuccessSoftBrush}" Padding="10,4" Visibility="Collapsed"
+                            ToolTip="TLS 1.3 with both devices' keys pinned at pairing. Nothing leaves your local network.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource GlyphText}" Text="&#xE72E;" FontSize="12" Foreground="{DynamicResource SuccessBrush}"/>
+                            <TextBlock Text="Encrypted · local network only" FontSize="12" Margin="6,0,0,0" Foreground="{DynamicResource SuccessBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="PairInlineButton" Style="{StaticResource AccentButton}" Content="Pair your phone" Visibility="Collapsed" Click="Pair_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Drop zone -->
+        <Grid Grid.Row="3" Margin="0,0,0,16">
+            <Border x:Name="DropZone" CornerRadius="14" Background="{DynamicResource DropZoneBrush}" Padding="24,18" MinHeight="160">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border x:Name="DropIconCircle" Width="52" Height="52" CornerRadius="26" Background="{DynamicResource AccentSoftBrush}" HorizontalAlignment="Center">
+                        <TextBlock Style="{StaticResource GlyphText}" Text="&#xE898;" FontSize="22" Foreground="{DynamicResource AccentTextBrush}"/>
+                    </Border>
+                    <TextBlock x:Name="DropTitle" Text="Drop files, folders or text here" Style="{StaticResource HeadingText}"
+                               HorizontalAlignment="Center" Margin="0,12,0,3"/>
+                    <TextBlock x:Name="DropSubtitle" Style="{StaticResource SubtleText}" HorizontalAlignment="Center"
+                               Text="They go straight to your phone over your local network. Folders are zipped."/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                        <Button Style="{StaticResource SecondaryButton}" Click="ChooseFiles_Click" AutomationProperties.Name="Choose files">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphText}" Text="&#xE8E5;" Margin="0,0,8,0"/>
+                                <TextBlock Text="Choose files…"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="ChooseFolder_Click" AutomationProperties.Name="Choose folder">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphText}" Text="&#xE8B7;" Margin="0,0,8,0"/>
+                                <TextBlock Text="Choose folder…"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Click="SendClipboard_Click" AutomationProperties.Name="Send clipboard"
+                                ToolTip="Sends whatever you last copied: text, a link, an image or files">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource GlyphText}" Text="&#xE77F;" Margin="0,0,8,0"/>
+                                <TextBlock Text="Send clipboard"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <Rectangle x:Name="DropOutline" RadiusX="14" RadiusY="14" Stroke="{DynamicResource DropZoneBorderBrush}"
+                       StrokeThickness="1.5" StrokeDashArray="5 4" IsHitTestVisible="False"/>
+        </Grid>
+
+        <!-- Compose -->
+        <Border Grid.Row="4" Margin="0,0,0,22" Padding="4,4,5,5" Style="{StaticResource ComposerFrame}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="ComposeBox" Style="{StaticResource BareInputBox}" Tag="Type a message or paste a link…   Ctrl+Enter sends"
+                         AutomationProperties.Name="Message to send" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="130"
+                         HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                         PreviewKeyDown="Compose_PreviewKeyDown" TextChanged="Compose_TextChanged"/>
+                <Button x:Name="SendTextButton" Grid.Column="1" Style="{StaticResource AccentButton}" Margin="6,0,0,0"
+                        VerticalAlignment="Bottom" MinHeight="34" Padding="16,0" IsEnabled="False" Click="SendText_Click"
+                        AutomationProperties.Name="Send">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource GlyphText}" Text="&#xE724;" Margin="0,0,8,0"/>
+                        <TextBlock Text="Send"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Activity header -->
+        <DockPanel Grid.Row="5" Margin="2,0,2,8">
+            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Clear finished" Click="ClearFinished_Click" VerticalAlignment="Center"/>
+            <TextBlock Text="Activity" Style="{StaticResource HeadingText}" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- Activity list -->
+        <Border Grid.Row="6" Style="{StaticResource Card}" Padding="0">
+            <Grid>
+                <ListBox x:Name="ActivityList" Style="{StaticResource PlainList}" ItemContainerStyle="{StaticResource PlainItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type v:ItemViewModel}">
+                            <Grid Margin="10,9,8,9">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="38" Height="38" CornerRadius="10" Background="{Binding IconBackground}" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource GlyphText}" Text="{Binding Glyph}" FontSize="16" Foreground="{Binding IconForeground}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleTooltip}" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextBrush}"/>
+                                    <WrapPanel Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding DirectionText}" Style="{StaticResource CaptionText}"/>
+                                        <TextBlock Text="  ·  " Style="{StaticResource CaptionText}"/>
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}"/>
+                                        <TextBlock Text="  ·  " Style="{StaticResource CaptionText}"/>
+                                        <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="SemiBold" Foreground="{Binding StatusBrush}"/>
+                                    </WrapPanel>
+                                    <ProgressBar Style="{StaticResource ThinProgress}" Value="{Binding Progress, Mode=OneWay}" Margin="0,7,0,1"
+                                                 Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="{Binding Error}" FontSize="12" Foreground="{DynamicResource DangerBrush}" Margin="0,3,0,0"
+                                               TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="{Binding Note}" FontSize="12" Foreground="{DynamicResource WarningBrush}" Margin="0,3,0,0"
+                                               TextWrapping="Wrap" Visibility="{Binding HasNote, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE8C8;" ToolTip="Copy text" AutomationProperties.Name="Copy text" Click="Copy_Click"
+                                            Visibility="{Binding CanCopy, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE8A7;" ToolTip="Open link in browser" AutomationProperties.Name="Open link in browser" Click="OpenLink_Click"
+                                            Visibility="{Binding CanOpenLink, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE8E5;" ToolTip="Open file" AutomationProperties.Name="Open file" Click="OpenFile_Click"
+                                            Visibility="{Binding CanOpenFile, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE838;" ToolTip="Show in folder" AutomationProperties.Name="Show in folder" Click="ShowInFolder_Click"
+                                            Visibility="{Binding CanShowInFolder, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE72C;" ToolTip="Try again" AutomationProperties.Name="Try again" Click="Retry_Click"
+                                            Visibility="{Binding CanRetry, Converter={StaticResource BoolToVis}}"/>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE711;" ToolTip="Remove from list" AutomationProperties.Name="Remove from list" Click="Remove_Click" FontSize="12"
+                                            Visibility="{Binding CanRemove, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" IsHitTestVisible="False">
+                    <TextBlock Style="{StaticResource GlyphText}" Text="&#xE81C;" FontSize="28" Foreground="{DynamicResource FaintTextBrush}"/>
+                    <TextBlock Text="Nothing here yet" Style="{StaticResource HeadingText}" HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                    <TextBlock Style="{StaticResource SubtleText}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="380"
+                               Text="Files, links and messages you send or receive will show up here."/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,19 @@
+<resources>
+    <style name="Theme.Dropper" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Share sheet: transparent window; the card and scrim are drawn in Compose. -->
+    <style name="Theme.Dropper.Share" parent="Theme.Dropper">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
+
+    <!-- QR scanner (ZXing). values-v35 opts it out of forced edge-to-edge so the
+         library's bottom-aligned prompt isn't hidden behind the navigation bar. -->
+    <style name="Theme.Dropper.Scanner" parent="zxing_CaptureTheme" />
+</resources>
