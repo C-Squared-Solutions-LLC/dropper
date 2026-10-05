@@ -69,6 +69,21 @@ object ItemActions {
     fun isApk(name: String): Boolean = name.endsWith(".apk", ignoreCase = true)
 
     /**
+     * MIME type to put on a share intent. Media and documents keep their real type so the
+     * share sheet only lists apps that handle them. Anything else (APK, zip, raw binary) is
+     * shared as the wildcard: apps such as Google Messages accept arbitrary files but only
+     * register for specific types plus wildcard shares, so a real APK type would hide them.
+     * The receiving app still reads the true type from the content URI.
+     */
+    fun shareType(mime: String): String {
+        val m = mime.lowercase()
+        val specific = m.startsWith("image/") || m.startsWith("video/") || m.startsWith("audio/") ||
+            m.startsWith("text/") || m == "application/pdf" || m.startsWith("application/vnd.openxmlformats") ||
+            m.startsWith("application/vnd.ms-") || m == "application/msword"
+        return if (specific) m else "*/*"
+    }
+
+    /**
      * ACTION_VIEW for a received file. APKs always carry the package-archive MIME type,
      * which is what routes them to the Package Installer.
      */
@@ -86,7 +101,7 @@ object ItemActions {
             intent.putExtra(Intent.EXTRA_TEXT, item.text ?: return)
         } else {
             val uri = item.uri?.let(Uri::parse) ?: return
-            intent.type = item.mime.ifBlank { "application/octet-stream" }
+            intent.type = shareType(item.mime)
             intent.putExtra(Intent.EXTRA_STREAM, uri)
             // The read grant only reaches the app picked in the chooser when the URI is
             // also in ClipData; without it Messages/SMS apps can't open the attachment.
