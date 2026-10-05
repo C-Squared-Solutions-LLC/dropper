@@ -6,7 +6,7 @@ public static class Wire
     public const int DefaultPort = 47823;
     public const int DiscoveryPort = 47823;
     public const int ProtocolVersion = 1;
-    public const string AppVersion = "1.0.2";
+    public const string AppVersion = "1.0.3";
 
     public const int PreambleLength = 61;
     public const byte ModeSession = 0x01;
