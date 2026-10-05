@@ -71,7 +71,7 @@ $start = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Program
 $start.TargetPath = $exe
 $start.WorkingDirectory = $dest
 $start.IconLocation = "$exe,0"
-$start.Description = 'Send files and text between this PC and your phone'
+$start.Description = 'Send files and text between this PC, your phone and your other PCs'
 $start.Save()
 Write-Host 'Start menu: Dropper'
 $sendTo = Join-Path ([Environment]::GetFolderPath('SendTo')) 'Dropper (phone).lnk'
@@ -130,4 +130,4 @@ if (-not $NoLaunch) {
     Step 'Starting Dropper'
     Start-Process $exe
 }
-Write-Host "`nDone. Next: install the Android app on your phone, then click 'Pair a phone' in Dropper." -ForegroundColor Green
+Write-Host "`nDone. Next: install the Android app on your phone, then click 'Pair a device' in Dropper. To add another PC, install Dropper there and choose Pair a device > Another PC on both." -ForegroundColor Green
