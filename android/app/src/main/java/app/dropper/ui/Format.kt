@@ -1,6 +1,7 @@
 package app.dropper.ui
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -85,13 +86,22 @@ object ItemActions {
             intent.putExtra(Intent.EXTRA_TEXT, item.text ?: return)
         } else {
             val uri = item.uri?.let(Uri::parse) ?: return
-            intent.type = item.mime
+            intent.type = item.mime.ifBlank { "application/octet-stream" }
             intent.putExtra(Intent.EXTRA_STREAM, uri)
+            // The read grant only reaches the app picked in the chooser when the URI is
+            // also in ClipData; without it Messages/SMS apps can't open the attachment.
+            intent.clipData = ClipData.newRawUri(item.name, uri)
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+        val chooser = Intent.createChooser(intent, null)
+        if (intent.clipData != null) {
+            chooser.clipData = intent.clipData
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
         try {
-            context.startActivity(Intent.createChooser(intent, null))
+            context.startActivity(chooser)
         } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "No app can share this", Toast.LENGTH_SHORT).show()
         }
     }
 }
