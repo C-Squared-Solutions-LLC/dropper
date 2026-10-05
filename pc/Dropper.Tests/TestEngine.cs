@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using Dropper.Core.Crypto;
 using Dropper.Core.Engine;
 using Dropper.Core.Net;
+using Dropper.Core.Protocol;
 
 namespace Dropper.Tests;
 
@@ -16,7 +17,7 @@ internal sealed class TestEngine : IAsyncDisposable
     public int DiscoveryPort { get; }
     private readonly string _keyName = "DropperTest-PC-" + Guid.NewGuid().ToString("N");
 
-    private TestEngine()
+    private TestEngine(int? peerDiscoveryPort, string pcName)
     {
         Root = Path.Combine(Path.GetTempPath(), "dropper-test-" + Guid.NewGuid().ToString("N"));
         ReceiveDir = Path.Combine(Root, "received");
@@ -27,18 +28,19 @@ internal sealed class TestEngine : IAsyncDisposable
             DataDirectory = Path.Combine(Root, "data"),
             KeyName = _keyName,
             AllowTpm = false,
-            PcName = "TEST-PC",
             ListenOverride = [new LanAddress(IPAddress.Loopback, 8, "loopback", "lo")],
             PortOverride = Port,
             DiscoveryPort = DiscoveryPort,
             DiscoveryBindAddress = IPAddress.Loopback,
             ReceiveFolderOverride = ReceiveDir,
+            PeerDiscoveryPort = peerDiscoveryPort ?? Wire.DiscoveryPort,
+            PcName = pcName,
         });
     }
 
-    public static async Task<TestEngine> StartAsync()
+    public static async Task<TestEngine> StartAsync(int? peerDiscoveryPort = null, string pcName = "TEST-PC")
     {
-        var t = new TestEngine();
+        var t = new TestEngine(peerDiscoveryPort, pcName);
         await t.Engine.StartAsync();
         Assert.True(t.Engine.IsListening, t.Engine.NetworkError);
         return t;

@@ -11,6 +11,8 @@ public static class Wire
     public const int PreambleLength = 61;
     public const byte ModeSession = 0x01;
     public const byte ModePairing = 0x02;
+    /// <summary>PC-to-PC pairing by code comparison (docs/PROTOCOL.md §8.4).</summary>
+    public const byte ModePcPairing = 0x03;
 
     public const int MaxFrameBody = 1_048_576;
     public const int MaxJson = 65_536;
@@ -65,6 +67,11 @@ public enum FrameType : byte
     PairRequest = 0x20,
     PairOk = 0x21,
     PairFail = 0x22,
+    SasHello = 0x23,
+    SasCommit = 0x24,
+    SasNonce = 0x25,
+    SasReveal = 0x26,
+    SasConfirm = 0x27,
 }
 
 /// <summary>A peer broke the protocol. The connection is closed immediately.</summary>

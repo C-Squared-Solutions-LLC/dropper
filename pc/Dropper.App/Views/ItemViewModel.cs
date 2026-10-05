@@ -36,7 +36,7 @@ public sealed class ItemViewModel(ActivityItem item, Func<string, bool> isConnec
     public string StatusText => Item.State switch
     {
         ItemState.Preparing => "Preparing…",
-        ItemState.Queued => isConnected(Item.DeviceFp) ? "Queued" : "Waiting for phone",
+        ItemState.Queued => isConnected(Item.DeviceFp) ? "Queued" : "Waiting for device",
         ItemState.Sending => $"Sending {Percent}%",
         ItemState.Receiving => $"Receiving {Percent}%",
         ItemState.Delivered => "Delivered",

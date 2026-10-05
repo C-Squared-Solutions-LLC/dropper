@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -17,6 +18,9 @@ public partial class PairingWindow : Window
     private PairingTicket? _ticket;
     private PairingRequest? _pending;
     private bool _finished;
+    private DateTimeOffset? _pcHostUntil;
+    private TaskCompletionSource<bool>? _joinerConfirm;
+    private CancellationTokenSource? _joinerCts;
 
     internal PairingWindow(App app)
     {
@@ -45,6 +49,21 @@ public partial class PairingWindow : Window
 
     private void UpdateExpiry()
     {
+        if (_pcHostUntil is { } until)
+        {
+            var remaining = until - _app.Engine.Now;
+            if (remaining <= TimeSpan.Zero)
+            {
+                _pcHostUntil = null;
+                _app.Engine.CancelPcPairing();
+                HostStatus.Text = "Stopped waiting. Start again whenever the other PC is ready.";
+                HostButton.Content = "Let another PC find this one";
+            }
+            else
+            {
+                HostStatus.Text = $"Waiting… On the other PC: Pair a device → Another PC → Find PCs. ({(int)remaining.TotalMinutes}:{remaining.Seconds:00} left)";
+            }
+        }
         if (_ticket is null) return;
         var left = _ticket.ExpiresAt - _app.Engine.Now;
         if (left <= TimeSpan.Zero)
@@ -61,6 +80,8 @@ public partial class PairingWindow : Window
     private void Show(FrameworkElement panel)
     {
         QrPanel.Visibility = panel == QrPanel ? Visibility.Visible : Visibility.Collapsed;
+        PcPanel.Visibility = panel == PcPanel ? Visibility.Visible : Visibility.Collapsed;
+        ModeSwitch.Visibility = panel == QrPanel || panel == PcPanel ? Visibility.Visible : Visibility.Collapsed;
         ApprovePanel.Visibility = panel == ApprovePanel ? Visibility.Visible : Visibility.Collapsed;
         ResultPanel.Visibility = panel == ResultPanel ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -73,7 +94,10 @@ public partial class PairingWindow : Window
         string model = string.IsNullOrEmpty(request.Model) ? "" : $" ({request.Model})";
         ApproveDeviceText.Text = $"“{request.DeviceName}”{model} wants to pair with this PC.";
         SasText.Text = request.Sas;
-        ApproveDetails.Text = $"From {request.From} · phone key {request.Fingerprint}";
+        ApproveDetails.Text = $"From {request.From} · key {request.Fingerprint}";
+        ApproveHint.Text = request.IsPc
+            ? "Approve only if the other PC shows exactly this code and you approve there too. If the codes differ, reject."
+            : "Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject.";
         ApproveButton.IsEnabled = RejectButton.IsEnabled = true;
         Show(ApprovePanel);
         Activate();
@@ -89,7 +113,7 @@ public partial class PairingWindow : Window
         if (outcome.Success)
             ShowResult(true, "Paired!", $"{outcome.DeviceName} can now send and receive. You can close this window.");
         else
-            ShowResult(false, "Not paired", outcome.Message + " Make a new code to try again.");
+            ShowResult(false, "Not paired", outcome.Message + (PcMode.IsChecked == true ? " Try again when both PCs are ready." : " Make a new code to try again."));
     }
 
     private void ShowResult(bool success, string title, string text)
@@ -108,19 +132,134 @@ public partial class PairingWindow : Window
     private void Approve_Click(object sender, RoutedEventArgs e)
     {
         ApproveButton.IsEnabled = RejectButton.IsEnabled = false;
-        _pending?.Approve();
+        if (_joinerConfirm is { } c) c.TrySetResult(true);
+        else _pending?.Approve();
     }
 
     private void Reject_Click(object sender, RoutedEventArgs e)
     {
         ApproveButton.IsEnabled = RejectButton.IsEnabled = false;
-        _pending?.Reject();
+        if (_joinerConfirm is { } c) c.TrySetResult(false);
+        else _pending?.Reject();
     }
 
     private void NewCode_Click(object sender, RoutedEventArgs e)
     {
+        if (PcMode.IsChecked == true)
+        {
+            _finished = false;
+            Show(PcPanel);
+            return;
+        }
         try { NewTicket(); }
         catch (InvalidOperationException ex) { ShowResult(false, "Can't pair right now", ex.Message); }
+    }
+
+    // ------------------------------------------------------------------ another PC
+
+    private void Mode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (QrPanel is null || PcPanel is null) return; // still initializing
+        if (PcMode.IsChecked == true)
+        {
+            _timer.Stop();
+            _app.Engine.CancelPairing();
+            _ticket = null;
+            _finished = false;
+            Show(PcPanel);
+            _timer.Start();
+        }
+        else
+        {
+            StopHosting();
+            try { NewTicket(); }
+            catch (InvalidOperationException ex) { ShowResult(false, "Can't pair right now", ex.Message); }
+        }
+    }
+
+    private void Host_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pcHostUntil is not null)
+        {
+            StopHosting();
+            return;
+        }
+        try
+        {
+            _pcHostUntil = _app.Engine.StartPcPairing();
+            HostButton.Content = "Stop waiting";
+            UpdateExpiry();
+            _timer.Start();
+        }
+        catch (InvalidOperationException ex)
+        {
+            HostStatus.Text = ex.Message;
+        }
+    }
+
+    private void StopHosting()
+    {
+        _pcHostUntil = null;
+        _app.Engine.CancelPcPairing();
+        HostStatus.Text = "Other PCs on your network can find this one for 3 minutes.";
+        HostButton.Content = "Let another PC find this one";
+    }
+
+    private async void Find_Click(object sender, RoutedEventArgs e)
+    {
+        FindButton.IsEnabled = false;
+        FindStatus.Text = "Looking…";
+        FoundList.Items.Clear();
+        var found = await _app.Engine.FindPcsAsync(TimeSpan.FromSeconds(1.5));
+        FindButton.IsEnabled = true;
+        FindButton.Content = "Search again";
+        if (found.Count == 0)
+        {
+            FindStatus.Text = "No PC is waiting. On the other PC, choose “Let another PC find this one”, then search again.";
+            return;
+        }
+        FindStatus.Text = found.Count == 1 ? "Found 1 PC:" : $"Found {found.Count} PCs:";
+        foreach (var pc in found)
+        {
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6), LastChildFill = true };
+            var pair = new Button { Style = (Style)FindResource("SecondaryButton"), Content = "Pair", Tag = pc };
+            pair.Click += PairWithFound_Click;
+            DockPanel.SetDock(pair, Dock.Right);
+            row.Children.Add(pair);
+            var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            label.Children.Add(new TextBlock { Text = pc.Name, FontWeight = FontWeights.SemiBold });
+            label.Children.Add(new TextBlock { Text = pc.Endpoint.Address.ToString(), Style = (Style)FindResource("CaptionText") });
+            row.Children.Add(label);
+            FoundList.Items.Add(row);
+        }
+    }
+
+    private async void PairWithFound_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not DiscoveredPc pc) return;
+        StopHosting();
+        _finished = false;
+        _joinerCts = new CancellationTokenSource();
+        FindStatus.Text = $"Connecting to {pc.Name}…";
+        var outcome = await _app.Engine.PairWithPcAsync(pc.Endpoint,
+            sas => Dispatcher.Invoke(() => AskJoinerToConfirm(pc, sas)), _joinerCts.Token);
+        _joinerConfirm = null;
+        if (!IsLoaded) return;
+        ShowOutcome(outcome);
+    }
+
+    /// <summary>Joiner side: show the 6-digit code and wait for the user's answer.</summary>
+    private Task<bool> AskJoinerToConfirm(DiscoveredPc pc, string sas)
+    {
+        _joinerConfirm = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ApproveDeviceText.Text = $"Pairing with “{pc.Name}” ({pc.Endpoint.Address}).";
+        SasText.Text = sas;
+        ApproveDetails.Text = "Approve here and on the other PC.";
+        ApproveHint.Text = "Approve only if the other PC shows exactly this code. If the codes differ, reject.";
+        ApproveButton.IsEnabled = RejectButton.IsEnabled = true;
+        Show(ApprovePanel);
+        Activate();
+        return _joinerConfirm.Task;
     }
 
     private void Done_Click(object sender, RoutedEventArgs e) => Close();
@@ -147,6 +286,9 @@ public partial class PairingWindow : Window
     {
         _timer.Stop();
         if (!_finished) _pending?.Reject();
+        _joinerConfirm?.TrySetResult(false);
+        _joinerCts?.Cancel();
         _app.Engine.CancelPairing();
+        _app.Engine.CancelPcPairing();
     }
 }

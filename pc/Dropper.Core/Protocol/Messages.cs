@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -112,16 +113,102 @@ public static class Messages
         return doc;
     }
 
-    public static HelloMessage ParsePhoneHello(ReadOnlyMemory<byte> body)
+    /// <summary>HELLO a PC sends when it is the connecting side (to another PC).</summary>
+    public static byte[] ClientPcHello(string name) => Object(w =>
+    {
+        w.WriteNumber("v", Wire.ProtocolVersion);
+        w.WriteString("role", "pc");
+        w.WriteString("name", name);
+        w.WriteString("model", "Windows PC");
+        w.WriteString("app", Wire.AppVersion);
+    });
+
+    /// <summary>HELLO from the connecting side: a phone, or another PC (role "pc").</summary>
+    public static HelloMessage ParseClientHello(ReadOnlyMemory<byte> body)
     {
         using var doc = Parse(body);
         var r = doc.RootElement;
         if (RequireInt(r, "v") != Wire.ProtocolVersion) throw new ProtocolException("unsupported protocol version");
-        if (RequireString(r, "role", 16) != "phone") throw new ProtocolException("unexpected role");
+        if (RequireString(r, "role", 16) is not ("phone" or "pc")) throw new ProtocolException("unexpected role");
         string name = TextSafety.CleanDisplayName(RequireString(r, "name", 256), Wire.MaxDeviceNameChars);
         string model = TextSafety.CleanDisplayName(OptionalString(r, "model", 256), Wire.MaxDeviceNameChars);
         string app = TextSafety.CleanDisplayName(OptionalString(r, "app", 64), 32);
-        return new HelloMessage(name.Length == 0 ? "Phone" : name, model, app);
+        return new HelloMessage(name.Length == 0 ? "Device" : name, model, app);
+    }
+
+    /// <summary>HELLO from the accepting PC, seen by a PC that connected to it. Keeps only LAN addresses.</summary>
+    public static (HelloMessage Hello, List<IPEndPoint> Addrs) ParseServerHello(ReadOnlyMemory<byte> body)
+    {
+        using var doc = Parse(body);
+        var r = doc.RootElement;
+        if (RequireInt(r, "v") != Wire.ProtocolVersion) throw new ProtocolException("unsupported protocol version");
+        if (RequireString(r, "role", 16) != "pc") throw new ProtocolException("unexpected role");
+        string name = TextSafety.CleanDisplayName(RequireString(r, "name", 256), Wire.MaxDeviceNameChars);
+        var addrs = new List<IPEndPoint>();
+        if (r.TryGetProperty("addrs", out var a) && a.ValueKind == JsonValueKind.Array)
+            foreach (var e in a.EnumerateArray().Take(4))
+                if (e.ValueKind == JsonValueKind.String && IPEndPoint.TryParse(e.GetString()!, out var ep)
+                    && Net.LanInterfaces.IsPrivate(ep.Address) && ep.Port is > 0 and <= 65535)
+                    addrs.Add(ep);
+        return (new HelloMessage(name.Length == 0 ? "PC" : name, "Windows PC", OptionalString(r, "app", 32)), addrs);
+    }
+
+    // ---------- PC-to-PC pairing (§8.4) ----------
+
+    public static byte[] SasHello(string name) => Object(w =>
+    {
+        w.WriteNumber("v", Wire.ProtocolVersion);
+        w.WriteString("name", name);
+        w.WriteString("model", "Windows PC");
+    });
+
+    public static byte[] Bytes(string field, ReadOnlySpan<byte> value)
+    {
+        string s = Base64Url.Encode(value);
+        return Object(w => w.WriteString(field, s));
+    }
+
+    public static byte[] SasConfirm(bool ok) => Object(w => w.WriteBoolean("ok", ok));
+
+    public static (string Name, string Model) ParseSasHello(ReadOnlyMemory<byte> body)
+    {
+        using var doc = Parse(body);
+        var r = doc.RootElement;
+        if (RequireInt(r, "v") != Wire.ProtocolVersion) throw new ProtocolException("unsupported protocol version");
+        string name = TextSafety.CleanDisplayName(RequireString(r, "name", 256), Wire.MaxDeviceNameChars);
+        string model = TextSafety.CleanDisplayName(OptionalString(r, "model", 256), Wire.MaxDeviceNameChars);
+        return (name.Length == 0 ? "PC" : name, model);
+    }
+
+    /// <summary>A single base64url field that must decode to exactly 32 bytes.</summary>
+    public static byte[] ParseBytes32(ReadOnlyMemory<byte> body, string field)
+    {
+        using var doc = Parse(body);
+        if (!Base64Url.TryDecode(RequireString(doc.RootElement, field, 64), out var b) || b.Length != 32)
+            throw new ProtocolException($"bad '{field}'");
+        return b;
+    }
+
+    public static bool ParseSasConfirm(ReadOnlyMemory<byte> body)
+    {
+        using var doc = Parse(body);
+        return RequireBool(doc.RootElement, "ok");
+    }
+
+    public static (string Name, byte[] Secret) ParsePairOk(ReadOnlyMemory<byte> body)
+    {
+        using var doc = Parse(body);
+        var r = doc.RootElement;
+        string name = TextSafety.CleanDisplayName(OptionalString(r, "name", 256), Wire.MaxDeviceNameChars);
+        if (!Base64Url.TryDecode(RequireString(r, "secret", 64), out var secret) || secret.Length != 32)
+            throw new ProtocolException("bad secret");
+        return (name.Length == 0 ? "PC" : name, secret);
+    }
+
+    public static string ParsePairFail(ReadOnlyMemory<byte> body)
+    {
+        using var doc = Parse(body);
+        return OptionalString(doc.RootElement, "error", 64);
     }
 
     /// <summary>

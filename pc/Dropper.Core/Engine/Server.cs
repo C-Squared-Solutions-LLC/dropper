@@ -161,6 +161,13 @@ internal sealed class Server : IAsyncDisposable
             var peerFp = Fingerprint.Of(peer);
             slot.Complete();
 
+            if (gate.Mode == Wire.ModePcPairing)
+            {
+                await using (ssl.ConfigureAwait(false))
+                    await _engine.HandlePcPairingAsync(ssl, peer, peerFp, ip, ct).ConfigureAwait(false);
+                return;
+            }
+
             if (gate.Mode == Wire.ModePairing)
             {
                 await using (ssl.ConfigureAwait(false))
@@ -206,7 +213,8 @@ internal sealed class Server : IAsyncDisposable
         if (cert is null) return false;
         using var c2 = new X509Certificate2(cert);
         if (!Fingerprint.IsP256(c2)) return false;
-        if (gate.Mode == Wire.ModePairing) return true; // bound to the QR secret by the PAIR_REQUEST proof
+        // Pairing modes: bound afterwards by the QR proof (phone) or the code comparison (PC).
+        if (gate.Mode != Wire.ModeSession) return true;
         return Kdf.FixedTimeEquals(Fingerprint.Of(c2), gate.Device!.Fp);
     }
 

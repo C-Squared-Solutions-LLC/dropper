@@ -45,6 +45,7 @@ Please don't open a public issue for security problems.
 | Device identity | ECDSA P-256 key pair. Fingerprint = SHA-256 of the SubjectPublicKeyInfo. |
 | Transport | TLS 1.3 only (AES-GCM / ChaCha20-Poly1305, ECDHE so every session has forward secrecy). Mutual certificate authentication with exact public-key pinning. Session resumption disabled, so every connection is a full handshake. |
 | Pairing | 256-bit one-time secret inside the QR code, with keys derived by HKDF-SHA256. An HMAC proof binds the secret to *both* TLS public keys. A 6-digit SAS (short authentication string) is compared by the user. |
+| PC-to-PC pairing | Numeric comparison with a commitment, as in Bluetooth Secure Simple Pairing. The host sends `SHA-256(Na ‖ fp_host ‖ fp_joiner)` before it sees the joiner's `Nb`. The 6-digit code is HMAC'd from `HKDF(Na ‖ Nb)` over both TLS fingerprints, and both users must approve. |
 | Pre-TLS gate | HMAC-SHA256 under a per-device key (HKDF from a 256-bit secret created when you approve pairing), plus timestamp and nonce. |
 | Discovery | HMAC-SHA256 request and response under a separate per-device key. |
 | Content integrity | SHA-256 of every item, checked end to end, on top of TLS's own AEAD. |
@@ -66,6 +67,19 @@ constant-time.
   the PC's exact public key, so the phone never has to "accept a certificate".
   The 6-digit comparison covers the remaining case of someone else scanning the
   code first.
+- **Two PCs have no camera between them.** They compare a 6-digit code instead.
+  A man in the middle sees a different fingerprint pair on each side, so to fool
+  both users it has to make two codes collide. Because of the commitment,
+  neither side can choose its nonce after seeing the other's. The attacker gets
+  one blind guess per attempt (10⁻⁶), each attempt needs both users to approve,
+  and 5 failures close the window.
+- **The PC-pairing window is the one time the gate is open.** Two PCs share no
+  secret before pairing, so the mode-3 preamble uses a public key. For up to
+  3 minutes after you click *Let another PC find this one*, any host on the LAN
+  subnet can reach the TLS handshake and see the PC's name in a discovery reply.
+  Only one attempt runs at a time. The per-IP throttle and the pre-auth limits
+  still apply, and nothing gets stored without both approvals. Outside that
+  window, mode 3 is refused before TLS, like any other bad preamble.
 - **Minimal dependencies.** The Windows app uses only the .NET base library plus
   QRCoder (to draw the QR code). The Android app uses AndroidX, Jetpack Compose
   and ZXing (to read the QR code). Neither app uses third-party networking or
@@ -90,7 +104,12 @@ constant-time.
   - hostile file names are sanitized and Mark-of-the-Web is applied;
   - every finding from the independent review stays fixed (truncation bypass,
     invisible code points, overflowing timestamps, idle-connection floods,
-    lock-out after bad greetings, tag-before-rename).
+    lock-out after bad greetings, tag-before-rename);
+  - two real engines pair PC to PC only when both sides approve, compute the
+    same code, and transfer both ways afterwards. A rejection on either side
+    stores nothing. A PC with no open window can't be found or paired. Removing
+    the pairing on one PC removes it on the other. The commitment binds the nonce
+    and both keys.
 - End-to-end runs pair the **real Android app** (emulator) with the **real
   Windows app**, through the actual UIs:
   - both screens showed the same 6-digit code;

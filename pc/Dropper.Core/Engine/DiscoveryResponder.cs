@@ -68,9 +68,17 @@ internal sealed class DiscoveryResponder : IAsyncDisposable
     private (byte[] Packet, IPEndPoint To)? Answer(ReadOnlySpan<byte> packet, IPEndPoint from, int arrivedOnInterface)
     {
         var ip = from.Address.IsIPv4MappedToIPv6 ? from.Address.MapToIPv4() : from.Address;
-        if (packet.Length != DiscoveryPacket.RequestLength) return null;
+        if (packet.Length is not (DiscoveryPacket.RequestLength or PcQueryPacket.RequestLength)) return null;
         var lan = _engine.FindLanFor(ip, arrivedOnInterface);
         if (lan is null) return null;
+        if (packet.Length == PcQueryPacket.RequestLength)
+        {
+            // Unauthenticated by nature (the PCs share nothing yet), so only while this PC's
+            // PC-pairing window is open, rate-limited, and never larger than the request.
+            var answer = _engine.AnswerPcQuery(packet);
+            if (answer is null || _rate.Record(ip, _engine.Now)) return null;
+            return (answer, new IPEndPoint(ip, from.Port));
+        }
         if (!DiscoveryPacket.TryParseRequest(packet, out long ts, out byte[] nonce)) return null;
         var now = _engine.Now;
         if (!Wire.IsFresh(ts, now)) return null;

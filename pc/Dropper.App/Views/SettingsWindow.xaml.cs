@@ -82,7 +82,7 @@ public partial class SettingsWindow : Window
             remove.Click += async (_, _) =>
             {
                 if (MessageBox.Show(this, $"Remove “{d.Name}”?\n\nIt will be disconnected and can't connect again until you pair it again.",
-                        "Remove phone", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+                        "Remove device", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
                 await _app.Engine.RemoveDeviceAsync(d.FpHex);
             };
             Grid.SetColumn(remove, 2);
@@ -135,7 +135,7 @@ public partial class SettingsWindow : Window
         bool ok = WindowsIntegration.FirewallRulesPresent();
         FirewallText.Text = ok
             ? "Allowed for your local subnet on private networks only."
-            : "Not set up yet. Your phone can't reach this PC until Dropper is allowed.";
+            : "Not set up yet. Your devices can't reach this PC until Dropper is allowed.";
         FirewallText.Foreground = (Brush)FindResource(ok ? "SuccessBrush" : "WarningBrush");
     }
 
@@ -197,7 +197,7 @@ public partial class SettingsWindow : Window
         if (port == _app.Engine.Port) return;
         _app.Engine.UpdateConfig(c => c.Port = port);
         MessageBox.Show(this,
-            "Port changed. Your phone finds the new port automatically through discovery." +
+            "Port changed. Paired devices find the new port automatically through discovery." +
             (WindowsIntegration.FirewallRulesPresent() ? "\n\nRun “Allow on local network…” again so the firewall rule uses the new port." : ""),
             "Dropper", MessageBoxButton.OK, MessageBoxImage.Information);
     }

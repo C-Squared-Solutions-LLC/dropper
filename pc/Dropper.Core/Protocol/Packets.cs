@@ -32,7 +32,7 @@ public static class Preamble
         mode = 0; tsMs = 0; nonce = Array.Empty<byte>();
         if (p.Length != Wire.PreambleLength || !p[..4].SequenceEqual(Magic)) return false;
         mode = p[4];
-        if (mode != Wire.ModeSession && mode != Wire.ModePairing) return false;
+        if (mode is not (Wire.ModeSession or Wire.ModePairing or Wire.ModePcPairing)) return false;
         tsMs = BinaryPrimitives.ReadInt64BigEndian(p[5..]);
         nonce = p.Slice(13, 16).ToArray();
         return true;
@@ -95,5 +95,59 @@ public static class DiscoveryPacket
         port = BinaryPrimitives.ReadUInt16BigEndian(p[8..]);
         nonce = p.Slice(10, 16).ToArray();
         return true;
+    }
+}
+
+/// <summary>
+/// "Which PCs are accepting a PC pairing right now?" (docs/PROTOCOL.md §10.1). Only a PC
+/// with its PC-pairing window open answers. The request is padded so the answer is
+/// never larger than the question (no amplification).
+/// </summary>
+public static class PcQueryPacket
+{
+    private static ReadOnlySpan<byte> RequestMagic => "DRQ1"u8;
+    private static ReadOnlySpan<byte> ResponseMagic => "DRQ2"u8;
+    public const int RequestLength = 100;
+    public const int MaxNameBytes = 64;
+
+    public static byte[] BuildRequest(ReadOnlySpan<byte> nonce16)
+    {
+        var p = new byte[RequestLength];
+        RequestMagic.CopyTo(p);
+        nonce16.CopyTo(p.AsSpan(4));
+        return p;
+    }
+
+    public static bool TryParseRequest(ReadOnlySpan<byte> p, out byte[] nonce)
+    {
+        nonce = Array.Empty<byte>();
+        if (p.Length != RequestLength || !p[..4].SequenceEqual(RequestMagic)) return false;
+        nonce = p.Slice(4, 16).ToArray();
+        return true;
+    }
+
+    public static byte[] BuildResponse(ReadOnlySpan<byte> nonce16, int port, string name)
+    {
+        var nameBytes = System.Text.Encoding.UTF8.GetBytes(TextSafety.Truncate(name, 32));
+        if (nameBytes.Length > MaxNameBytes) nameBytes = nameBytes[..MaxNameBytes];
+        var p = new byte[4 + 16 + 2 + 1 + nameBytes.Length];
+        ResponseMagic.CopyTo(p);
+        nonce16.CopyTo(p.AsSpan(4));
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(20), (ushort)port);
+        p[22] = (byte)nameBytes.Length;
+        nameBytes.CopyTo(p, 23);
+        return p;
+    }
+
+    public static bool TryParseResponse(ReadOnlySpan<byte> p, out byte[] nonce, out int port, out string name)
+    {
+        nonce = Array.Empty<byte>(); port = 0; name = "";
+        if (p.Length < 23 || p.Length > 23 + MaxNameBytes || !p[..4].SequenceEqual(ResponseMagic)) return false;
+        int len = p[22];
+        if (p.Length != 23 + len) return false;
+        nonce = p.Slice(4, 16).ToArray();
+        port = BinaryPrimitives.ReadUInt16BigEndian(p[20..]);
+        name = TextSafety.CleanDisplayName(System.Text.Encoding.UTF8.GetString(p.Slice(23, len)), 64);
+        return port > 0;
     }
 }

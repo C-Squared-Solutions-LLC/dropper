@@ -20,7 +20,7 @@ namespace Dropper.Core.Engine;
 /// the outbox and the activity history. Thread-safe; events fire on worker
 /// threads, so UI handlers must marshal to their dispatcher.
 /// </summary>
-public sealed class DropperEngine : IAsyncDisposable
+public sealed partial class DropperEngine : IAsyncDisposable
 {
     private readonly EngineOptions _options;
     private readonly object _gate = new();
@@ -113,6 +113,7 @@ public sealed class DropperEngine : IAsyncDisposable
         await StartNetworkAsync().ConfigureAwait(false);
         if (_options.ListenOverride is null)
             NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+        StartOutboundLoops();
     }
 
     private void LoadDevices()
@@ -252,6 +253,7 @@ public sealed class DropperEngine : IAsyncDisposable
                 changed = NetworkError is not null || !fresh.Select(l => l.ToString()).SequenceEqual(_lans.Select(l => l.ToString()));
             if (!changed) return;
             Log("Network changed; restarting listeners");
+            KickOutbound();
             try { await RestartNetworkAsync().ConfigureAwait(false); }
             catch (Exception ex) { Log($"Network restart failed: {ex.Message}"); }
         }, null, 2000, Timeout.Infinite);
@@ -261,6 +263,7 @@ public sealed class DropperEngine : IAsyncDisposable
     {
         NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
         _networkDebounce?.Dispose();
+        StopAllOutbound();
         List<Session> sessions;
         lock (_gate) sessions = _sessions.Values.ToList();
         await Task.WhenAll(sessions.Select(s => s.SayByeAsync("shutdown"))).ConfigureAwait(false);
@@ -289,9 +292,10 @@ public sealed class DropperEngine : IAsyncDisposable
 
     // ------------------------------------------------------------------ devices
 
+    /// <summary>Devices that connect TO this PC (phones, and PCs that paired with us as the joiner).</summary>
     internal IReadOnlyList<PairedDevice> PairedDevicesSnapshot()
     {
-        lock (_gate) return _devices.Values.ToList();
+        lock (_gate) return _devices.Values.Where(d => !d.Record.Outbound).ToList();
     }
 
     internal bool IsPaired(PairedDevice device)
@@ -310,13 +314,14 @@ public sealed class DropperEngine : IAsyncDisposable
                     _sessions.TryGetValue(d.FpHex, out var s);
                     return new DeviceStatus(d.FpHex, d.Record.Name, d.Record.Model,
                         s?.PeerHello is not null, s?.Remote.Address.ToString(), d.Record.LastSeen,
-                        d.Record.PairedAt, Fingerprint.Display(d.Fp));
+                        d.Record.PairedAt, Fingerprint.Display(d.Fp), d.Record.Kind);
                 })
                 .ToList();
         }
     }
 
-    internal void AddDevice(X509Certificate2 cert, byte[] fp, string name, string model, byte[] deviceSecret)
+    internal PairedDevice AddDevice(X509Certificate2 cert, byte[] fp, string name, string model, byte[] deviceSecret,
+        string kind = "phone", bool outbound = false, IEnumerable<string>? addresses = null)
     {
         string fpHex = Fingerprint.Hex(fp);
         var rec = new DeviceRecord
@@ -327,25 +332,32 @@ public sealed class DropperEngine : IAsyncDisposable
             Model = model,
             SecretProtected = Convert.ToBase64String(Dpapi.Protect(deviceSecret)),
             PairedAt = Now,
+            Kind = kind,
+            Outbound = outbound,
+            Addresses = addresses?.ToList() ?? new(),
         };
+        PairedDevice added;
         List<Session> replaced = new();
         lock (_gate)
         {
-            // A phone that re-pairs (e.g. after reinstalling the app) has a new key; drop the stale entry.
+            // A device that re-pairs (e.g. after reinstalling the app) has a new key; drop the stale
+            // entry of the same kind and direction.
             foreach (var old in _config.Devices.Where(d => d.Fp == fpHex ||
-                         string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase)).ToList())
+                         (string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase) && d.Kind == kind && d.Outbound == outbound)).ToList())
             {
                 _config.Devices.Remove(old);
                 _devices.Remove(old.Fp);
                 if (_sessions.TryGetValue(old.Fp, out var s)) replaced.Add(s);
             }
             _config.Devices.Add(rec);
-            _devices[fpHex] = new PairedDevice(rec, deviceSecret);
+            added = new PairedDevice(rec, deviceSecret);
+            _devices[fpHex] = added;
             _configStore.Save(_config);
         }
         foreach (var s in replaced) s.Close("replaced by a new pairing");
         Log($"Paired with '{name}' ({Fingerprint.Display(fp)})");
         Raise(DevicesChanged);
+        return added;
     }
 
     public async Task RemoveDeviceAsync(string fpHex)
@@ -371,9 +383,10 @@ public sealed class DropperEngine : IAsyncDisposable
             _sessions.TryGetValue(fpHex, out session);
             if (removed) _configStore.Save(_config);
         }
+        StopOutbound(fpHex);
         if (!removed) return session;
         foreach (var item in _activity.Where(i => i.DeviceFp == fpHex && i.IsPending))
-            FailItem(item, "Phone was unpaired");
+            FailItem(item, "Device was unpaired");
         Log(logMessage);
         Raise(DevicesChanged);
         return session;
@@ -471,6 +484,14 @@ public sealed class DropperEngine : IAsyncDisposable
             return GateDecision.Fail("unknown device");
         }
 
+        if (mode == Wire.ModePcPairing)
+        {
+            if (!PcPairingOpen(now)) return GateDecision.Fail("PC pairing attempt while no PC pairing window is open");
+            if (!Preamble.VerifyMac(preamble, Kdf.PcPairingGateKey)) return GateDecision.Fail("malformed PC pairing greeting");
+            if (!_replay.TryAdd(nonce, now)) return GateDecision.Fail("replayed PC pairing attempt");
+            return new GateDecision(true, mode, null, null, "");
+        }
+
         PairingTicket? ticket;
         lock (_gate) ticket = _ticket;
         if (ticket is null || !ticket.IsOpen(now)) return GateDecision.Fail("pairing attempt while no pairing window is open");
@@ -493,9 +514,9 @@ public sealed class DropperEngine : IAsyncDisposable
 
     // ------------------------------------------------------------------ sessions
 
-    internal async Task RunSessionAsync(TcpClient tcp, SslStream ssl, PairedDevice device, IPEndPoint remote)
+    internal async Task RunSessionAsync(TcpClient tcp, SslStream ssl, PairedDevice device, IPEndPoint remote, bool clientRole = false)
     {
-        var session = new Session(this, tcp, ssl, device, remote);
+        var session = new Session(this, tcp, ssl, device, remote, clientRole);
         Session? previous = null;
         bool stillPaired;
         lock (_gate)

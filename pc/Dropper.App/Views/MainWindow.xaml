@@ -22,11 +22,11 @@
             <Image Source="{StaticResource LogoImage}" Width="30" Height="30" DockPanel.Dock="Left"/>
             <TextBlock Text="Dropper" Style="{StaticResource TitleText}" Margin="11,0,0,1" VerticalAlignment="Center" DockPanel.Dock="Left"/>
             <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Settings" AutomationProperties.Name="Settings" Click="Settings_Click"/>
-            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="Pair_Click" AutomationProperties.Name="Pair a phone"
-                    ToolTip="Show a QR code to pair a phone">
+            <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Click="Pair_Click" AutomationProperties.Name="Pair a device"
+                    ToolTip="Pair a phone (QR code) or another PC">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource GlyphText}" Text="&#xED14;" Margin="0,0,8,0"/>
-                    <TextBlock Text="Pair a phone"/>
+                    <TextBlock Text="Pair a device"/>
                 </StackPanel>
             </Button>
         </DockPanel>
@@ -52,7 +52,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Border Width="44" Height="44" CornerRadius="22" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource GlyphText}" Text="&#xE8EA;" FontSize="20" Foreground="{DynamicResource AccentTextBrush}"/>
+                    <TextBlock x:Name="DeviceGlyph" Style="{StaticResource GlyphText}" Text="&#xE8EA;" FontSize="20" Foreground="{DynamicResource AccentTextBrush}"/>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
                     <TextBlock x:Name="DeviceNameText" Style="{StaticResource HeadingText}" Text="Starting…" TextTrimming="CharacterEllipsis"/>
@@ -76,7 +76,7 @@
                             <TextBlock Text="Encrypted · local network only" FontSize="12" Margin="6,0,0,0" Foreground="{DynamicResource SuccessBrush}"/>
                         </StackPanel>
                     </Border>
-                    <Button x:Name="PairInlineButton" Style="{StaticResource AccentButton}" Content="Pair your phone" Visibility="Collapsed" Click="Pair_Click"/>
+                    <Button x:Name="PairInlineButton" Style="{StaticResource AccentButton}" Content="Pair a device" Visibility="Collapsed" Click="Pair_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -91,7 +91,7 @@
                     <TextBlock x:Name="DropTitle" Text="Drop files, folders or text here" Style="{StaticResource HeadingText}"
                                HorizontalAlignment="Center" Margin="0,12,0,3"/>
                     <TextBlock x:Name="DropSubtitle" Style="{StaticResource SubtleText}" HorizontalAlignment="Center"
-                               Text="They go straight to your phone over your local network. Folders are zipped."/>
+                               Text="They go straight to the selected device over your local network. Folders are zipped."/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
                         <Button Style="{StaticResource SecondaryButton}" Click="ChooseFiles_Click" AutomationProperties.Name="Choose files">
                             <StackPanel Orientation="Horizontal">

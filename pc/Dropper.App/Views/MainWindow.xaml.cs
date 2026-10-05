@@ -106,8 +106,9 @@ public partial class MainWindow : Window
 
         if (devices.Count == 0)
         {
-            DeviceNameText.Text = "No phone paired yet";
-            SetStatus(engine.NetworkError ?? "Pair your phone to start sending.", engine.NetworkError is null ? "NeutralDotBrush" : "DangerBrush");
+            DeviceNameText.Text = "Nothing paired yet";
+            DeviceGlyph.Text = "";
+            SetStatus(engine.NetworkError ?? "Pair your phone or another PC to start sending.", engine.NetworkError is null ? "NeutralDotBrush" : "DangerBrush");
             PairInlineButton.Visibility = Visibility.Visible;
             SecureBadge.Visibility = Visibility.Collapsed;
         }
@@ -115,12 +116,15 @@ public partial class MainWindow : Window
         {
             var target = CurrentTarget(devices)!;
             DeviceNameText.Text = target.Name;
+            DeviceGlyph.Text = target.Kind == "pc" ? "" : "";
             if (engine.NetworkError is { } error)
                 SetStatus(error, "DangerBrush");
             else if (target.Connected)
                 SetStatus($"Connected · {target.RemoteAddress}", "SuccessBrush");
             else
-                SetStatus("Not connected · open Dropper on your phone. Anything you send waits here until it connects.", "NeutralDotBrush");
+                SetStatus(target.Kind == "pc"
+                    ? "Not connected · start Dropper on that PC. Anything you send waits here until it connects."
+                    : "Not connected · open Dropper on your phone. Anything you send waits here until it connects.", "NeutralDotBrush");
             PairInlineButton.Visibility = Visibility.Collapsed;
             SecureBadge.Visibility = Visibility.Visible;
         }
@@ -211,7 +215,7 @@ public partial class MainWindow : Window
 
     public void ChooseFiles()
     {
-        var dlg = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Choose files to send to your phone" };
+        var dlg = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Choose files to send" };
         if (dlg.ShowDialog(this) == true) Queue(dlg.FileNames);
     }
 
@@ -252,7 +256,7 @@ public partial class MainWindow : Window
     {
         DropZone.Background = (Brush)FindResource(on ? "DropZoneActiveBrush" : "DropZoneBrush");
         DropOutline.Stroke = (Brush)FindResource(on ? "AccentBrush" : "DropZoneBorderBrush");
-        DropTitle.Text = on ? "Release to send to your phone" : "Drop files, folders or text here";
+        DropTitle.Text = on ? "Release to send" : "Drop files, folders or text here";
     }
 
     // Files are taken anywhere in the window (even over the text box).

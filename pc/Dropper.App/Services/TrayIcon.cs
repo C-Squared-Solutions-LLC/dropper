@@ -15,10 +15,10 @@ internal sealed class TrayIcon : IDisposable
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Open Dropper", null, (_, _) => open());
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("Send clipboard to phone", null, (_, _) => sendClipboard());
+        menu.Items.Add("Send clipboard", null, (_, _) => sendClipboard());
         menu.Items.Add("Send files…", null, (_, _) => sendFiles());
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("Pair a phone…", null, (_, _) => pair());
+        menu.Items.Add("Pair a device…", null, (_, _) => pair());
         menu.Items.Add("Settings", null, (_, _) => settings());
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("Quit Dropper", null, (_, _) => quit());

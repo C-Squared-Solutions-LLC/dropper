@@ -17,6 +17,8 @@ public sealed class EngineOptions
     public IReadOnlyList<LanAddress>? ListenOverride { get; init; }
     public int? PortOverride { get; init; }
     public int DiscoveryPort { get; init; } = Wire.DiscoveryPort;
+    /// <summary>UDP port other PCs answer discovery on (tests run several engines on one machine).</summary>
+    public int PeerDiscoveryPort { get; init; } = Wire.DiscoveryPort;
     /// <summary>Tests only: bind discovery to loopback instead of all interfaces.</summary>
     public IPAddress DiscoveryBindAddress { get; init; } = IPAddress.Any;
     public bool EnableDiscovery { get; init; } = true;
@@ -50,7 +52,8 @@ public sealed record DeviceStatus(
     string? RemoteAddress,
     DateTimeOffset? LastSeen,
     DateTimeOffset PairedAt,
-    string FingerprintDisplay);
+    string FingerprintDisplay,
+    string Kind = "phone");
 
 /// <summary>An open pairing window: the secret behind one QR code.</summary>
 public sealed class PairingTicket
@@ -82,13 +85,14 @@ public sealed class PairingRequest
     private readonly TaskCompletionSource<bool> _decision = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _abandoned = new();
 
-    internal PairingRequest(string deviceName, string model, string sas, string fingerprint, IPAddress from)
+    internal PairingRequest(string deviceName, string model, string sas, string fingerprint, IPAddress from, bool isPc = false)
     {
         DeviceName = deviceName;
         Model = model;
         Sas = sas;
         Fingerprint = fingerprint;
         From = from;
+        IsPc = isPc;
     }
 
     public string DeviceName { get; }
@@ -97,6 +101,8 @@ public sealed class PairingRequest
     public string Sas { get; }
     public string Fingerprint { get; }
     public IPAddress From { get; }
+    /// <summary>True when another Dropper PC is asking; both sides compare the code.</summary>
+    public bool IsPc { get; }
 
     /// <summary>Fires if the phone disconnects or the approval times out, so the UI can close its prompt.</summary>
     public CancellationToken Abandoned => _abandoned.Token;

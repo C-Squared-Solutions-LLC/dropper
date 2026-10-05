@@ -84,7 +84,7 @@ internal static class Firewall
     {
         dynamic rule = Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.FWRule", throwOnError: true)!)!;
         rule.Name = name;
-        rule.Description = "Dropper: accept your paired phone from the local subnet only.";
+        rule.Description = "Dropper: accept your paired devices from the local subnet only.";
         rule.Grouping = "Dropper";
         rule.ApplicationName = exe;
         rule.Protocol = protocol; // must be set before LocalPorts

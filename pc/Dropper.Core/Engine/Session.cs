@@ -11,7 +11,8 @@ using Dropper.Core.Storage;
 namespace Dropper.Core.Engine;
 
 /// <summary>
-/// One authenticated phone connection (mode 1). Runs three loops: a reader that
+/// One authenticated connection (mode 1): a phone or PC that connected to us, or, in
+/// the client role, another PC that this PC connected to. Runs three loops: a reader that
 /// handles incoming frames, a sender that drains this device's outbox, and an
 /// idle watchdog. Whichever ends first ends the session.
 /// </summary>
@@ -27,12 +28,15 @@ internal sealed class Session
     private readonly TaskCompletionSource _helloReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _replyGate = new();
     private long _lastReceived = Stopwatch.GetTimestamp();
+    private long _lastPing = Stopwatch.GetTimestamp();
+    private static readonly TimeSpan ClientPingInterval = TimeSpan.FromSeconds(45);
     private IncomingTransfer? _incoming;
     private string? _awaitingId;
     private TaskCompletionSource<ReplyMessage>? _awaitingReply;
 
-    public Session(DropperEngine engine, TcpClient tcp, SslStream ssl, PairedDevice device, IPEndPoint remote)
+    public Session(DropperEngine engine, TcpClient tcp, SslStream ssl, PairedDevice device, IPEndPoint remote, bool clientRole = false)
     {
+        IsClient = clientRole;
         _engine = engine;
         _tcp = tcp;
         _ssl = ssl;
@@ -43,6 +47,8 @@ internal sealed class Session
     }
 
     public PairedDevice Device { get; }
+    /// <summary>This PC opened the connection (to another PC), so it sends the keep-alive pings.</summary>
+    public bool IsClient { get; }
     public IPEndPoint Remote { get; }
     public HelloMessage? PeerHello { get; private set; }
     public string EndReason { get; private set; } = "";
@@ -73,8 +79,10 @@ internal sealed class Session
         Task? reader = null, sender = null, watchdog = null;
         try
         {
-            await _writer.WriteAsync(FrameType.Hello,
-                Messages.PcHello(_engine.PcName, _engine.AdvertisedEndpoints().Select(e => e.ToString())), ct).ConfigureAwait(false);
+            var hello = IsClient
+                ? Messages.ClientPcHello(_engine.PcName)
+                : Messages.PcHello(_engine.PcName, _engine.AdvertisedEndpoints().Select(e => e.ToString()));
+            await _writer.WriteAsync(FrameType.Hello, hello, ct).ConfigureAwait(false);
             reader = ReadLoopAsync(ct);
             sender = SendLoopAsync(ct);
             watchdog = WatchdogAsync(ct);
@@ -130,7 +138,16 @@ internal sealed class Session
             try { first = await _reader.ReadAsync(helloTimeout.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new TimeoutException("no HELLO from phone"); }
             if (first.type != FrameType.Hello) throw new ProtocolException("expected HELLO");
-            PeerHello = Messages.ParsePhoneHello(first.body);
+            if (IsClient)
+            {
+                var (hello, addrs) = Messages.ParseServerHello(first.body);
+                PeerHello = hello;
+                _engine.RememberAddresses(Device, addrs.Prepend(Remote));
+            }
+            else
+            {
+                PeerHello = Messages.ParseClientHello(first.body);
+            }
         }
         Touch();
         _engine.OnSessionReady(this);
@@ -418,6 +435,11 @@ internal sealed class Session
         while (true)
         {
             await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+            if (IsClient && Stopwatch.GetElapsedTime(_lastPing) >= ClientPingInterval)
+            {
+                _lastPing = Stopwatch.GetTimestamp();
+                await _writer.WriteAsync(FrameType.Ping, ct).ConfigureAwait(false);
+            }
             var idle = Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastReceived));
             if (idle > Wire.IdleTimeout) throw new TimeoutException($"no traffic from the phone for {idle.TotalSeconds:0} s");
         }

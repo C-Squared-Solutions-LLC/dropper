@@ -31,7 +31,7 @@
                         <StackPanel>
                             <TextBlock Text="Copy received text to the clipboard"/>
                             <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,2,0,0"
-                                       Text="Text and links from your phone are ready to paste right away."/>
+                                       Text="Text and links from your devices are ready to paste right away."/>
                         </StackPanel>
                     </CheckBox>
                     <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
@@ -69,16 +69,16 @@
                 </StackPanel>
             </Border>
 
-            <!-- Paired phones -->
-            <TextBlock Text="PAIRED PHONES" Style="{StaticResource SectionText}"/>
+            <!-- Paired devices -->
+            <TextBlock Text="PAIRED DEVICES" Style="{StaticResource SectionText}"/>
             <Border Style="{StaticResource Card}" Margin="0,0,0,22">
                 <StackPanel>
                     <ItemsControl x:Name="DeviceList"/>
-                    <TextBlock x:Name="NoDevicesText" Style="{StaticResource SubtleText}" Text="No phones are paired yet." Visibility="Collapsed"/>
-                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="Pair_Click" AutomationProperties.Name="Pair a phone">
+                    <TextBlock x:Name="NoDevicesText" Style="{StaticResource SubtleText}" Text="Nothing is paired yet." Visibility="Collapsed"/>
+                    <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0" Click="Pair_Click" AutomationProperties.Name="Pair a device">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource GlyphText}" Text="&#xED14;" Margin="0,0,8,0"/>
-                            <TextBlock Text="Pair a phone…"/>
+                            <TextBlock Text="Pair a device…"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -146,7 +146,7 @@
                              FontFamily="Cascadia Mono, Consolas" FontSize="12.5" Foreground="{DynamicResource SubtleTextBrush}"
                              TextWrapping="Wrap"/>
                     <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,8,0,0"
-                               Text="Your phone pinned this key when you paired, and checks it on every connection. Phones present their own pinned key back (mutual TLS 1.3)."/>
+                               Text="Every paired device pinned this key when you paired, and checks it on every connection. Each device presents its own pinned key back (mutual TLS 1.3)."/>
                     <Rectangle Height="1" Fill="{DynamicResource DividerBrush}" Margin="0,14"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -154,7 +154,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"
-                                   Text="Make a brand-new key. Every phone is unpaired and must pair again."/>
+                                   Text="Make a brand-new key. Every phone and PC is unpaired and must pair again."/>
                         <Button Grid.Column="1" Style="{StaticResource DangerButton}" Content="Reset identity…" Click="ResetIdentity_Click"/>
                     </Grid>
                 </StackPanel>
@@ -170,7 +170,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock x:Name="VersionText"/>
-                        <TextBlock Style="{StaticResource SubtleText}" Text="Sends files and text between this PC and your phone. No cloud, no accounts." Margin="0,2,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Style="{StaticResource SubtleText}" Text="Sends files and text between this PC, your phone and your other PCs. No cloud, no accounts." Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="Open log folder" Click="OpenLogs_Click" VerticalAlignment="Center"/>
                 </Grid>

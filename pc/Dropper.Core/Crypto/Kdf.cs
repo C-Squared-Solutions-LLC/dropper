@@ -40,6 +40,32 @@ public static class Kdf
         return n.ToString("D6");
     }
 
+    // ---------- PC-to-PC pairing by code comparison (docs/PROTOCOL.md §8.4) ----------
+
+    public const string PcSasInfo = "dropper/v1/pc-sas";
+
+    /// <summary>
+    /// Key for the mode-0x03 preamble. Deliberately public: two PCs pairing share no
+    /// secret yet. The preamble only keeps the format uniform; the security comes from
+    /// the commitment and the 6-digit comparison.
+    /// </summary>
+    public static readonly byte[] PcPairingGateKey = SHA256.HashData("dropper/v1/pc-pairing-gate"u8);
+
+    /// <summary>commit = SHA256("dropper/v1/sas-commit" || Na || fp_host || fp_joiner)</summary>
+    public static byte[] PcSasCommit(ReadOnlySpan<byte> na, ReadOnlySpan<byte> fpHost, ReadOnlySpan<byte> fpJoiner)
+    {
+        var buf = new byte[21 + 96];
+        "dropper/v1/sas-commit"u8.CopyTo(buf);
+        na.CopyTo(buf.AsSpan(21));
+        fpHost.CopyTo(buf.AsSpan(53));
+        fpJoiner.CopyTo(buf.AsSpan(85));
+        return SHA256.HashData(buf);
+    }
+
+    /// <summary>Six digits from both nonces and both keys; equal on both PCs only without a man in the middle.</summary>
+    public static string PcSas(ReadOnlySpan<byte> na, ReadOnlySpan<byte> nb, ReadOnlySpan<byte> fpHost, ReadOnlySpan<byte> fpJoiner) =>
+        Sas(Hkdf32(Concat(na, nb), PcSasInfo), fpHost, fpJoiner);
+
     public static string FormatSas(string sas) => sas.Length == 6 ? sas[..3] + " " + sas[3..] : sas;
 
     private static byte[] Concat(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)

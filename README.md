@@ -3,7 +3,7 @@
 <h1 align="center">Dropper</h1>
 
 <p align="center">
-Send files, APKs, photos, links and text between your Windows PC and your Android phone.<br>
+Send files, APKs, photos, links and text between your Windows PC, your Android phone and your other PCs.<br>
 Over your own network only. No cloud, no account, no port open to the internet.
 </p>
 
@@ -17,7 +17,8 @@ Over your own network only. No cloud, no account, no port open to the internet.
 Drop a file on the window and it shows up on your phone. Share something on the
 phone and it lands in `Downloads\Dropper` on the PC. The two devices pair once
 with a QR code. After that every connection is mutually authenticated TLS 1.3,
-and both keys live in hardware.
+and both keys live in hardware. Two PCs pair the same way without the camera:
+each screen shows a 6-digit code, and you approve on both.
 
 | | Windows | Android |
 |---|---|---|
@@ -65,9 +66,18 @@ The app isn't on Google Play yet, so install the APK directly:
 
 ### Pair (once)
 
-1. On the PC, click **Pair a phone**. A QR code appears; it's valid for 3 minutes and works once.
+1. On the PC, click **Pair a device**. A QR code appears; it's valid for 3 minutes and works once.
 2. On the phone, open Dropper → **Scan QR code**.
 3. Both screens show the same 6-digit code. If they match, click **Codes match · Approve** on the PC.
+
+**PC to PC** (both on the same network, both running Dropper):
+
+1. On the first PC: **Pair a device** → **Another PC** → **Let another PC find this one**.
+2. On the second PC: **Pair a device** → **Another PC** → **Find PCs** → **Pair**.
+3. Both PCs show a 6-digit code. If the codes are the same, approve on **both**.
+
+After pairing, the main window has a device picker. Choose where to send, and
+either PC can send to the other.
 
 Then, on the phone, open Dropper → Settings → *Background reliability* → **Allow**.
 On Samsung, also add Dropper to Settings → Battery → *Background usage limits* →
@@ -80,6 +90,9 @@ The short version:
 
 - **QR pairing.** The phone learns the PC's exact public key from the QR code,
   and you confirm a 6-digit code on both screens. There's no trust-on-first-use.
+- **PC-to-PC pairing by code comparison.** One PC commits to its random value
+  before it sees the other's, so someone in the middle can't pick values that
+  make the two codes match. Both users must approve.
 - **TLS 1.3, both ways pinned.** Each side accepts only the key it paired with.
 - **Hardware keys.** The PC's identity key lives in the TPM; the phone's in the
   Android Keystore (TEE). Neither can be exported.
@@ -109,7 +122,7 @@ Found a vulnerability? Report it privately through the repo's **Security** tab
 | PC's IP changed | Nothing to do. The phone finds the PC again through authenticated discovery (UDP 47823). |
 | Tapping an APK does nothing | Allow *Install unknown apps* for Dropper when Android asks. |
 | "clock difference" in the log | Connections are refused when the phone and PC clocks differ by more than 10 minutes. Turn on automatic time on both. |
-| Lost the phone | PC → Settings → Paired phones → **Remove**. It's locked out immediately. |
+| Lost the phone | PC → Settings → Paired devices → **Remove**. It's locked out immediately. |
 
 Logs are in `%LOCALAPPDATA%\Dropper\dropper.log`. They never contain file contents, text or keys.
 

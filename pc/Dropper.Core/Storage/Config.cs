@@ -14,6 +14,12 @@ public sealed class DeviceRecord
     public string SecretProtected { get; set; } = ""; // base64(DPAPI(device_secret))
     public DateTimeOffset PairedAt { get; set; }
     public DateTimeOffset? LastSeen { get; set; }
+    /// <summary>"phone" or "pc".</summary>
+    public string Kind { get; set; } = "phone";
+    /// <summary>True when THIS PC connects to that peer (another PC we paired with as the joiner).</summary>
+    public bool Outbound { get; set; }
+    /// <summary>Last known "ip:port" list for an outbound peer.</summary>
+    public List<string> Addresses { get; set; } = new();
 }
 
 public sealed class AppConfig

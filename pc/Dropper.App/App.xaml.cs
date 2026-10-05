@@ -139,7 +139,7 @@ public partial class App : Application
     {
         if (_tray is null || _engine is null || !EngineReady) return;
         var connected = Engine.GetDevices().FirstOrDefault(d => d.Connected);
-        _tray.SetTooltip(connected is not null ? $"Dropper · {connected.Name} connected" : "Dropper · waiting for your phone");
+        _tray.SetTooltip(connected is not null ? $"Dropper · {connected.Name} connected" : "Dropper · nothing connected");
     }
 
     // ------------------------------------------------------------------ commands

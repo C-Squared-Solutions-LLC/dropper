@@ -1,13 +1,50 @@
 <Window x:Class="Dropper.App.Views.PairingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Pair a phone" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        Title="Pair a device" Width="480" SizeToContent="Height" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Icon="/Assets/Dropper.ico"
         Style="{StaticResource WindowStyle}">
-    <Grid Margin="30,26,30,28">
+    <Grid Margin="30,22,30,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="ModeSwitch" Orientation="Horizontal" Margin="0,0,0,18">
+            <RadioButton x:Name="PhoneMode" Style="{StaticResource ChoiceRadio}" GroupName="mode" IsChecked="True"
+                         Content="Phone" Margin="0,0,8,0" Padding="10,6" Checked="Mode_Checked"/>
+            <RadioButton x:Name="PcMode" Style="{StaticResource ChoiceRadio}" GroupName="mode"
+                         Content="Another PC" Margin="0" Padding="10,6" Checked="Mode_Checked"/>
+        </StackPanel>
+
+        <!-- Another PC -->
+        <StackPanel x:Name="PcPanel" Grid.Row="1" Visibility="Collapsed">
+            <TextBlock Text="Pair another PC" Style="{StaticResource TitleText}"/>
+            <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,6,0,18" FontSize="14"
+                       Text="Both PCs need Dropper on the same network. Let one PC be found, find it from the other, then check that both show the same 6-digit code."/>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Let this PC be found" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="HostStatus" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,10"
+                               Text="Other PCs on your network can find this one for 3 minutes."/>
+                    <Button x:Name="HostButton" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left"
+                            Content="Let another PC find this one" Click="Host_Click"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Find a PC" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="FindStatus" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,10"
+                               Text="Looks for PCs that are letting themselves be found right now."/>
+                    <ItemsControl x:Name="FoundList" Margin="0,0,0,8"/>
+                    <Button x:Name="FindButton" Style="{StaticResource AccentButton}" HorizontalAlignment="Left"
+                            Content="Find PCs" Click="Find_Click"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <!-- Step 1: QR code -->
-        <StackPanel x:Name="QrPanel">
+        <StackPanel x:Name="QrPanel" Grid.Row="1">
             <TextBlock Text="Pair your phone" Style="{StaticResource TitleText}"/>
             <TextBlock Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,6,0,20" FontSize="14"
                        Text="Open Dropper on your phone, tap “Scan QR code”, and point the camera at this code."/>
@@ -45,7 +82,7 @@
         </StackPanel>
 
         <!-- Step 2: compare the code -->
-        <StackPanel x:Name="ApprovePanel" Visibility="Collapsed">
+        <StackPanel x:Name="ApprovePanel" Grid.Row="1" Visibility="Collapsed">
             <TextBlock Text="Check the code" Style="{StaticResource TitleText}"/>
             <TextBlock x:Name="ApproveDeviceText" Style="{StaticResource BodyText}" Margin="0,8,0,0"/>
             <Border CornerRadius="14" Background="{DynamicResource AccentSoftBrush}" Padding="20,18" Margin="0,18,0,0">
@@ -53,7 +90,7 @@
                            Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center"/>
             </Border>
             <TextBlock Style="{StaticResource BodyText}" Margin="0,16,0,0"
-                       Text="Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject."/>
+                       x:Name="ApproveHint" Text="Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject."/>
             <TextBlock x:Name="ApproveDetails" Style="{StaticResource CaptionText}" Margin="0,10,0,0" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
                 <Button x:Name="RejectButton" Style="{StaticResource SecondaryButton}" Content="Reject" MinWidth="96" Click="Reject_Click"/>
@@ -62,7 +99,7 @@
         </StackPanel>
 
         <!-- Step 3: result -->
-        <StackPanel x:Name="ResultPanel" Visibility="Collapsed">
+        <StackPanel x:Name="ResultPanel" Grid.Row="1" Visibility="Collapsed">
             <Border x:Name="ResultIconCircle" Width="60" Height="60" CornerRadius="30" Background="{DynamicResource SuccessSoftBrush}" HorizontalAlignment="Center">
                 <TextBlock x:Name="ResultGlyph" Style="{StaticResource GlyphText}" Text="&#xE73E;" FontSize="26" Foreground="{DynamicResource SuccessBrush}"/>
             </Border>

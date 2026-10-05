@@ -61,6 +61,11 @@ Java: `SHA256(cert.publicKey.encoded)`. .NET: `SHA256(cert.PublicKey.ExportSubje
 | `sas_key` | `HKDF(pairing_secret, "dropper/v1/sas")` |
 | `gate_key` | `HKDF(device_secret, "dropper/v1/gate")` |
 | `disc_key` | `HKDF(device_secret, "dropper/v1/discovery")` |
+| `pc_gate_key` | `SHA256("dropper/v1/pc-pairing-gate")`. A public constant used only for the mode-3 preamble (§8.4). |
+
+For PC-to-PC pairing (§8.4) there is no `pairing_secret`. The host PC still makes
+the `device_secret`, and from then on the joining PC plays the phone's part in
+every rule below: it connects, it sends the mode-1 preamble and it runs discovery.
 
 ## 5. Pairing QR code
 
@@ -79,15 +84,17 @@ the PC's exact public key, so no later step needs trust-on-first-use.
 
 ## 6. Connection establishment
 
-### 6.1 Preamble (61 bytes, plaintext, sent by the phone right after TCP connect)
+### 6.1 Preamble (61 bytes, plaintext, sent by the client right after TCP connect)
+
+"Client" means the phone, or a PC that joined another PC (§8.4).
 
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 4 | magic `"DRP1"` (`44 52 50 31`) |
-| 4 | 1 | mode: `0x01` = session (paired device), `0x02` = pairing |
+| 4 | 1 | mode: `0x01` = session (paired device), `0x02` = QR pairing, `0x03` = PC-to-PC pairing |
 | 5 | 8 | `ts`: sender wall clock, Unix epoch milliseconds |
 | 13 | 16 | `nonce`: random |
-| 29 | 32 | `mac = HMAC(key, bytes[0..29))`, where `key` = `gate_key` (mode 1) or `pair_gate_key` (mode 2) |
+| 29 | 32 | `mac = HMAC(key, bytes[0..29))`, where `key` = `gate_key` (mode 1), `pair_gate_key` (mode 2) or `pc_gate_key` (mode 3) |
 
 The PC reads exactly 61 bytes (3 s timeout) and, **before any TLS byte is
 processed**, checks that:
@@ -96,7 +103,10 @@ processed**, checks that:
 3. `nonce` has not been seen in the last 20 minutes (replay cache);
 4. for mode 1, `mac` matches the `gate_key` of some paired device (try each,
    constant-time). For mode 2, a pairing window is open and `mac` matches its
-   `pair_gate_key`.
+   `pair_gate_key`. For mode 3, a PC-pairing window is open, no attempt is in
+   progress, and `mac` matches `pc_gate_key`. The mode-3 mac proves nothing
+   because the key is public. It only keeps the greeting format uniform; §8.4
+   carries the security.
 
 On any failure the PC **closes the socket without sending a single byte**.
 Failures are counted per source IP: a silent or truncated greeting, an invalid
@@ -128,6 +138,10 @@ entries.
     completes.
   - mode 2: accept any P-256 client certificate. The `PAIR_REQUEST` proof
     (§8.2) binds it to the QR secret.
+  - mode 3: accept any P-256 client certificate. The joiner likewise accepts
+    any server certificate. The code comparison in §8.4 binds both keys.
+- A PC acting as client (a joiner) checks the host's leaf `fp` against the pin
+  it stored, exactly as a phone does. It uses no revocation or AIA downloads.
 - Handshake timeout: 10 s.
 
 ### 6.3 After the handshake
@@ -135,6 +149,8 @@ entries.
 - **Mode 2 (pairing):** the phone sends `PAIR_REQUEST`. The PC answers
   `PAIR_OK` or `PAIR_FAIL`, then closes. After `PAIR_OK` the phone stores the
   pairing and reconnects in mode 1. No `HELLO` happens on a pairing connection.
+- **Mode 3 (PC pairing):** the §8.4 exchange, then close. The joiner stores the
+  pairing and reconnects in mode 1.
 - **Mode 1 (session):** both sides send `HELLO` immediately (full duplex). Each
   waits ≤ 10 s for the peer's `HELLO`. After that, anything goes (§9). One live
   session per device: a new authenticated session from the same device replaces
@@ -167,8 +183,13 @@ Required fields that are missing or have the wrong type are a protocol error.
 | `0x15` | RESULT | JSON `{"id","ok"[,"error"]}` | receiver → sender |
 | `0x16` | CANCEL | JSON `{"id"}` | sender → receiver |
 | `0x20` | PAIR_REQUEST | JSON | phone → PC (mode 2 only) |
-| `0x21` | PAIR_OK | JSON | PC → phone (mode 2 only) |
-| `0x22` | PAIR_FAIL | JSON | PC → phone (mode 2 only) |
+| `0x21` | PAIR_OK | JSON | PC → phone (mode 2), host → joiner (mode 3) |
+| `0x22` | PAIR_FAIL | JSON | PC → phone (mode 2), host → joiner (mode 3) |
+| `0x23` | SAS_HELLO | JSON `{"v","name"[,"model"]}` | joiner → host (mode 3 only) |
+| `0x24` | SAS_COMMIT | JSON `{"commit"}` | host → joiner (mode 3 only) |
+| `0x25` | SAS_NONCE | JSON `{"nonce"}` | joiner → host (mode 3 only) |
+| `0x26` | SAS_REVEAL | JSON `{"nonce"}` | host → joiner (mode 3 only) |
+| `0x27` | SAS_CONFIRM | JSON `{"ok": bool}` | joiner → host (mode 3 only) |
 
 Writers MUST write each frame atomically. Use one write lock per connection so
 that ACCEPT/RESULT/PONG frames interleave *between* the DATA frames of a
@@ -186,6 +207,11 @@ Phone → PC:
 ```json
 {"v":1,"role":"phone","name":"Alex's S23 Ultra","model":"SM-S918B","app":"1.0.0"}
 ```
+A PC that joined another PC (§8.4) is the client and sends the client HELLO with
+`"role":"pc"` and `"model":"Windows PC"`. The host then accepts `role` ∈
+`{"phone","pc"}` from the client. The client still requires `"role":"pc"` from the
+server, and it uses `addrs` the same way the phone does.
+
 `v` must be `1` and `role` must be the peer's role, otherwise it's a protocol error.
 `name` ≤ 64 chars (display only, sanitized). The phone MAY replace its stored PC
 address list with `addrs`, keeping only entries that pass the §5 address rules.
@@ -225,7 +251,7 @@ The phone shows the same SAS (it can compute it locally) with the text
 ### 8.3 PING / PONG / BYE
 
 - Either side may send `PING`; the other side must answer `PONG` promptly.
-- The phone sends `PING` after 45 s with no frame sent. If no `PONG` arrives
+- The client (phone or joined PC) sends `PING` after 45 s with no frame sent. If no `PONG` arrives
   within 15 s, it reconnects.
 - The PC closes a session that has received nothing for 120 s.
 - `BYE {"reason":"unpaired"}` from the PC means the user removed this phone. The
@@ -234,6 +260,57 @@ The phone shows the same SAS (it can compute it locally) with the text
   PC removes that device's record. This is safe because only the paired phone can
   speak inside its authenticated session.
   `"shutdown"` means the peer is exiting; just reconnect later.
+
+### 8.4 PC-to-PC pairing (mode 3)
+
+Two PCs share no camera and no prior secret. They use numeric comparison with a
+commitment, as Bluetooth Secure Simple Pairing does: each user reads a 6-digit
+code on their own screen, and **both** must approve.
+
+The **host** is the PC whose user clicked "Let another PC find this one". That
+opens a PC-pairing window for 180 s. The window allows one attempt at a time. A
+success closes it; 5 failed attempts also close it. The **joiner** finds hosts
+with the §10.1 query and connects in mode 3.
+
+All nonces are 32 random bytes, sent as base64url without padding. `fp_host` and
+`fp_joiner` are the fingerprints of the certificates presented in this TLS session.
+
+1. Joiner → `SAS_HELLO {"v":1,"name":"DESKTOP-JOIN","model":"Windows PC"}`.
+   If another attempt is in progress or the window has closed, the host answers
+   `PAIR_FAIL {"error":"busy"}` and closes.
+2. Host picks `Na` and sends `SAS_COMMIT {"commit": b64u(C)}`, where
+   `C = SHA256("dropper/v1/sas-commit" || Na || fp_host || fp_joiner)`.
+3. Joiner picks `Nb` and sends `SAS_NONCE {"nonce": b64u(Nb)}`.
+4. Host sends `SAS_REVEAL {"nonce": b64u(Na)}`.
+5. The joiner recomputes `C` and compares it constant-time. On a mismatch it
+   aborts. Something is in the middle.
+6. Both compute
+   `SAS = u32(HMAC(HKDF(Na || Nb, "dropper/v1/pc-sas"), fp_host || fp_joiner)[0..4]) mod 1 000 000`,
+   shown as `"123 456"`. Both users are told to approve only if the other
+   screen shows the same digits.
+7. Joiner → `SAS_CONFIRM {"ok": true|false}` with its user's answer.
+8. The host waits ≤ 120 s for **both** its own user's decision and the joiner's
+   `SAS_CONFIRM`. It stops at the first "no". A hang-up or a malformed frame
+   counts as "no".
+   - Both yes: generate `device_secret`, store the joiner as a device of kind
+     `pc`, and send `PAIR_OK {"v":1,"name":"DESKTOP-HOST","secret":"<b64u>"}`.
+   - Otherwise: `PAIR_FAIL {"error":"rejected" | "timeout"}`.
+9. On `PAIR_OK` the joiner stores the host as an **outbound** peer:
+   `{fp_host, cert DER, name, device_secret (encrypted), last address}`. It then
+   connects in mode 1 like a phone, using the same gate key, HELLO, ping cadence
+   and discovery. Reconnect backoff: 2, 5, 15, 30, 60, 120 s. A network change
+   resets it.
+
+**Why the commitment matters.** A man in the middle runs one TLS session with
+each PC, so each side's view has a different `fp` pair. To make both screens show
+the same 6 digits, the attacker has to pick its own nonces so that two
+independent HMAC outputs collide mod 10⁶. The host has committed to `Na` before
+it sees `Nb`, and the joiner has sent `Nb` before it sees `Na`. The attacker
+therefore can't search for a match. It gets one guess per attempt, a 10⁻⁶ chance,
+and every attempt needs both humans to approve.
+
+Pairing between two PCs is symmetric afterwards. Either side can send, and
+`BYE {"reason":"unpaired"}` from either side removes the pairing on both.
 
 ## 9. Transfers
 
@@ -325,6 +402,37 @@ and to the last known PC IP.
 - Accept a response only if its mac verifies under the phone's `disc_key`, the
   nonce matches an outstanding request, and the IP is RFC 1918.
 - Then connect to that IP and port, and save them as the new last-known address.
+
+### 10.1 PC-pairing query (same UDP port)
+
+A joiner looks for hosts with an open PC-pairing window (§8.4). Nothing here is
+secret. A host's window is open for at most 180 s, and pairing still requires
+the code comparison.
+
+**Request (exactly 100 bytes, broadcast):**
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | magic `"DRQ1"` |
+| 4 | 16 | `nonce` |
+| 20 | 80 | zero padding |
+
+**Response (23 + n bytes, n ≤ 64, unicast to the request's source):**
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | magic `"DRQ2"` |
+| 4 | 16 | `nonce`, echoed |
+| 20 | 2 | TCP port, big-endian |
+| 22 | 1 | `n` = length of the name |
+| 23 | n | PC name, UTF-8, at most 32 characters |
+
+The host answers only while its PC-pairing window is open and not busy. It uses
+the same LAN and subnet checks and the same per-IP rate limit as §10. Without an
+open window, a PC is silent and can't be found. The padding keeps every response
+smaller than the request, so the query can't amplify traffic. The joiner keeps
+only responses that echo its nonce and come from a LAN subnet. It skips its own
+address.
 
 ## 11. Receiver-side content rules
 
