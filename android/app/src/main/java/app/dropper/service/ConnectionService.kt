@@ -36,7 +36,7 @@ class ConnectionService : Service() {
     override fun onCreate() {
         super.onCreate()
         graph = DropperApp.graph(this)
-        if (!goForeground(graph.connection.state.value)) {
+        if (graph.quit || !goForeground(graph.connection.state.value)) {
             stopSelf()
             return
         }
@@ -98,7 +98,8 @@ class ConnectionService : Service() {
 
         /** Starts (or pokes) the service. Silently ignored if Android doesn't allow it right now. */
         fun start(context: Context) {
-            if (DropperApp.graph(context).pairingRepo.current == null) return
+            val graph = DropperApp.graph(context)
+            if (graph.pairingRepo.current == null || graph.quit) return
             try {
                 ContextCompat.startForegroundService(context, Intent(context, ConnectionService::class.java))
             } catch (e: Exception) {
@@ -125,6 +126,10 @@ class BootReceiver : BroadcastReceiver() {
 /** Notification actions (not exported; reached only through our immutable PendingIntents). */
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_QUIT) {
+            DropperApp.graph(context).quit()
+            return
+        }
         if (intent.action != ACTION_COPY) return
         val id = intent.getStringExtra(EXTRA_ID) ?: return
         val graph = DropperApp.graph(context)
@@ -136,6 +141,7 @@ class ActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_COPY = "app.dropper.action.COPY"
+        const val ACTION_QUIT = "app.dropper.action.QUIT"
         const val EXTRA_ID = "id"
     }
 }

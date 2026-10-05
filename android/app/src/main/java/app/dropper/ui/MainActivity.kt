@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         graph.visibility.onStart()
+        graph.resume() // opening the app after Quit brings the connection back
         ConnectionService.start(this)
     }
 

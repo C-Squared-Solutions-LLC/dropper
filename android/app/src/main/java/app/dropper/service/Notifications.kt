@@ -68,6 +68,14 @@ object Notifications {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openApp(context))
+            .addAction(
+                0, "Quit",
+                PendingIntent.getBroadcast(
+                    context, ID_SERVICE,
+                    Intent(context, ActionReceiver::class.java).setAction(ActionReceiver.ACTION_QUIT),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
             .build()
     }
 

@@ -192,6 +192,7 @@ private fun ShareSheet(
     fun send() = scope.launch {
         submitted = true
         phase = Phase.Preparing
+        graph.resume() // sharing after Quit is an explicit request to connect again
         val newIds = ArrayList<String>()
         val errors = ArrayList<String>()
         for (t in content.texts) {

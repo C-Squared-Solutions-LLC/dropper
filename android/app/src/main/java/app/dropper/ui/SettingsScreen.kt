@@ -193,6 +193,19 @@ fun SettingsScreen(graph: AppGraph, onBack: () -> Unit) {
                 ) { Text("Unpair this phone") }
             }
 
+            Section("Quit") {
+                Text(
+                    "Stops the background connection and closes Dropper. Nothing arrives until you open it again or share something to it. Your pairing is kept.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val activity = LocalContext.current as? android.app.Activity
+                OutlinedButton(onClick = {
+                    graph.quit()
+                    activity?.finishAffinity()
+                }) { Text("Quit Dropper") }
+            }
+
             Text(
                 "Dropper ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,

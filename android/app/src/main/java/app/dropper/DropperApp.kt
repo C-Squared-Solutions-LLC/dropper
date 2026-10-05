@@ -2,6 +2,10 @@ package app.dropper
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import app.dropper.service.ConnectionService
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.dropper.data.HistoryRepository
 import app.dropper.data.Outbox
 import app.dropper.data.PairingRepository
@@ -57,6 +61,32 @@ class AppGraph(val context: Context) {
         connection.sayGoodbye()
         connection.stop()
         wipePairing()
+    }
+
+    /**
+     * Set when the user picks Quit. Until the app is opened (or shared to) again, nothing
+     * restarts the background connection. Process-local on purpose: a reboot with
+     * "Stay connected" on brings Dropper back as usual.
+     */
+    @Volatile
+    var quit = false
+        private set
+
+    /** Quit for real: say BYE "shutdown" to the PC, drop the connection, stop the service. */
+    fun quit() {
+        quit = true
+        scope.launch(Dispatchers.IO) {
+            connection.sayShutdown()
+            connection.stop()
+            withContext(Dispatchers.Main) {
+                context.stopService(Intent(context, ConnectionService::class.java))
+            }
+        }
+    }
+
+    /** The user opened Dropper or shared something to it: allow the connection again. */
+    fun resume() {
+        quit = false
     }
 
     /** The PC sent BYE "unpaired". */

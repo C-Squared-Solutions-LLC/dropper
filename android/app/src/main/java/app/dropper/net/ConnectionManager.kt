@@ -87,6 +87,11 @@ class ConnectionManager(private val graph: AppGraph) {
         session?.sendByeAndClose("unpaired")
     }
 
+    /** The user quit Dropper: tell the PC we're going away (not unpairing), then drop the socket. */
+    fun sayShutdown() {
+        session?.sendByeAndClose("shutdown")
+    }
+
     private suspend fun loop() {
         var failures = 0
         val netWatch = graph.scope.launch {
