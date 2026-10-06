@@ -119,13 +119,20 @@ internal sealed class Server : IAsyncDisposable
                 return;
             }
 
-            // 2. TLS 1.3, mutual authentication, keys pinned.
+            // 2. TLS 1.3, mutual authentication, keys pinned. TLS 1.2 only for a PC-to-PC pairing
+            // attempt (consent is asked before anything is stored) or a device whose user allowed it.
+            bool allowTls12 = gate.Mode == Wire.ModePcPairing || gate.Device?.Record.Tls12Allowed == true;
+            if (TlsPolicy.Offer(allowTls12, _engine.Tls13Available) is not { } protocols)
+            {
+                RecordFailure(ip, "this device needs TLS 1.3, which this version of Windows doesn't have");
+                return;
+            }
             var ssl = new SslStream(net, leaveInnerStreamOpen: false);
             var options = new SslServerAuthenticationOptions
             {
                 ServerCertificateContext = _certContext,
                 ClientCertificateRequired = true,
-                EnabledSslProtocols = SslProtocols.Tls13,
+                EnabledSslProtocols = protocols,
                 AllowTlsResume = false,
                 AllowRenegotiation = false,
                 // The client chain is built (then ignored: we pin the key) before our callback
@@ -153,8 +160,9 @@ internal sealed class Server : IAsyncDisposable
             }
 
             using var peer = ssl.RemoteCertificate is null ? null : new X509Certificate2(ssl.RemoteCertificate);
-            if (ssl.SslProtocol != SslProtocols.Tls13 || peer is null)
+            if (!TlsPolicy.IsAcceptable(ssl, allowTls12) || peer is null)
             {
+                if (peer is not null) RecordFailure(ip, $"refused {ssl.SslProtocol} / {ssl.NegotiatedCipherSuite}");
                 await ssl.DisposeAsync().ConfigureAwait(false);
                 return;
             }

@@ -20,6 +20,11 @@ public sealed class DeviceRecord
     public bool Outbound { get; set; }
     /// <summary>Last known "ip:port" list for an outbound peer.</summary>
     public List<string> Addresses { get; set; } = new();
+    /// <summary>
+    /// The user on THIS PC allowed TLS 1.2 for this device when pairing (a Windows 10 PC has
+    /// no TLS 1.3). False for everything else, which stays TLS 1.3 only.
+    /// </summary>
+    public bool Tls12Allowed { get; set; }
 }
 
 public sealed class AppConfig

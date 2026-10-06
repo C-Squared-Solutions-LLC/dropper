@@ -114,7 +114,9 @@ public sealed partial class DropperEngine
             await writer.WriteAsync(FrameType.SasReveal, Messages.Bytes("nonce", na), ct).ConfigureAwait(false);
 
             string sas = Kdf.FormatSas(Kdf.PcSas(na, nb, hostFp, joinerFp));
-            var request = new PairingRequest(name, string.IsNullOrEmpty(model) ? "Windows PC" : model, sas, Fingerprint.Display(joinerFp), ip, isPc: true);
+            bool legacy = ssl.SslProtocol == SslProtocols.Tls12;
+            var request = new PairingRequest(name, string.IsNullOrEmpty(model) ? "Windows PC" : model, sas, Fingerprint.Display(joinerFp), ip,
+                isPc: true, legacyTls: legacy);
             var remote = ReadConfirmAsync(reader, watch.Token);
             RaisePairingRequested(request);
             var timeout = Task.Delay(Wire.ApprovalTimeout, ct);
@@ -137,7 +139,7 @@ public sealed partial class DropperEngine
             if (localOk && remoteOk)
             {
                 byte[] secret = RandomNumberGenerator.GetBytes(32);
-                AddDevice(peer, joinerFp, name, "Windows PC", secret, kind: "pc");
+                AddDevice(peer, joinerFp, name, "Windows PC", secret, kind: "pc", tls12Allowed: legacy);
                 await writer.WriteAsync(FrameType.PairOk, Messages.PairOk(PcName, secret), ct).ConfigureAwait(false);
                 CryptographicOperations.ZeroMemory(secret);
                 success = true;
@@ -218,7 +220,7 @@ public sealed partial class DropperEngine
     /// Joiner side of §8.4. <paramref name="confirm"/> shows the 6-digit code and returns the
     /// user's answer. On success the host is stored as an outbound peer and connected to.
     /// </summary>
-    public async Task<PairingOutcome> PairWithPcAsync(IPEndPoint host, Func<string, Task<bool>> confirm, CancellationToken ct = default)
+    public async Task<PairingOutcome> PairWithPcAsync(IPEndPoint host, Func<PcPairingCode, Task<bool>> confirm, CancellationToken ct = default)
     {
         if (FindLanFor(host.Address) is null)
             return new PairingOutcome(false, "That PC isn't on this computer's local network.", null);
@@ -233,7 +235,8 @@ public sealed partial class DropperEngine
             }
             var net = tcp.GetStream();
             await net.WriteAsync(Preamble.Build(Wire.ModePcPairing, Kdf.PcPairingGateKey, Now.ToUnixTimeMilliseconds()), ct).ConfigureAwait(false);
-            var (ssl, hostCert) = await ClientHandshakeAsync(net, pin: null, ct).ConfigureAwait(false);
+            // TLS 1.2 may be negotiated here, but nothing is stored unless the user allows it below.
+            var (ssl, hostCert) = await ClientHandshakeAsync(net, pin: null, allowTls12: true, ct).ConfigureAwait(false);
             await using (ssl.ConfigureAwait(false))
             using (hostCert)
             {
@@ -260,7 +263,8 @@ public sealed partial class DropperEngine
                     return new PairingOutcome(false, "The other PC's answer didn't match its commitment. Something may be interfering; pairing was stopped.", null);
 
                 string sas = Kdf.FormatSas(Kdf.PcSas(na, nb, hostFp, myFp));
-                bool ok = await confirm(sas).ConfigureAwait(false);
+                bool legacy = ssl.SslProtocol == SslProtocols.Tls12;
+                bool ok = await confirm(new PcPairingCode(sas, legacy)).ConfigureAwait(false);
                 await writer.WriteAsync(FrameType.SasConfirm, Messages.SasConfirm(ok), ct).ConfigureAwait(false);
                 if (!ok) return new PairingOutcome(false, "Pairing rejected.", null);
 
@@ -270,7 +274,7 @@ public sealed partial class DropperEngine
                 var (hostName, secret) = Messages.ParsePairOk(body);
 
                 var device = AddDevice(hostCert, hostFp, hostName, "Windows PC", secret,
-                    kind: "pc", outbound: true, addresses: new[] { host.ToString() });
+                    kind: "pc", outbound: true, addresses: new[] { host.ToString() }, tls12Allowed: legacy);
                 CryptographicOperations.ZeroMemory(secret);
                 StartOutbound(device);
                 return new PairingOutcome(true, $"Paired with {hostName}.", hostName);
@@ -418,7 +422,7 @@ public sealed partial class DropperEngine
             tcp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
             var net = tcp.GetStream();
             await net.WriteAsync(Preamble.Build(Wire.ModeSession, device.GateKey, Now.ToUnixTimeMilliseconds()), ct).ConfigureAwait(false);
-            var (ssl, peer) = await ClientHandshakeAsync(net, device.Fp, ct).ConfigureAwait(false);
+            var (ssl, peer) = await ClientHandshakeAsync(net, device.Fp, device.Record.Tls12Allowed, ct).ConfigureAwait(false);
             peer.Dispose();
             return (tcp, ssl);
         }
@@ -437,19 +441,22 @@ public sealed partial class DropperEngine
     }
 
     /// <summary>
-    /// TLS 1.3 client with this PC's identity as the client certificate. With a pin, only
+    /// TLS client (1.3; 1.2 only if allowed, see TlsPolicy) with this PC's identity as the client certificate. With a pin, only
     /// that exact key is accepted; without one (pairing) any P-256 key is accepted and
     /// returned, to be bound by the code comparison.
     /// </summary>
-    private async Task<(SslStream Ssl, X509Certificate2 Peer)> ClientHandshakeAsync(Stream net, byte[]? pin, CancellationToken ct)
+    private async Task<(SslStream Ssl, X509Certificate2 Peer)> ClientHandshakeAsync(Stream net, byte[]? pin, bool allowTls12, CancellationToken ct)
     {
+        if (TlsPolicy.Offer(allowTls12, Tls13Available) is not { } protocols)
+            throw new AuthenticationException("this connection needs TLS 1.3, which this version of Windows doesn't have");
         var mine = Identity.Certificate;
         var ssl = new SslStream(net, leaveInnerStreamOpen: false);
         var options = new SslClientAuthenticationOptions
         {
             TargetHost = "dropper",
-            EnabledSslProtocols = SslProtocols.Tls13,
+            EnabledSslProtocols = protocols,
             AllowTlsResume = false,
+            AllowRenegotiation = false,
             ClientCertificates = new X509CertificateCollection { mine },
             LocalCertificateSelectionCallback = (_, _, _, _, _) => mine,
             CertificateChainPolicy = new X509ChainPolicy
@@ -471,7 +478,7 @@ public sealed partial class DropperEngine
             t.CancelAfter(Wire.HandshakeTimeout);
             await ssl.AuthenticateAsClientAsync(options, t.Token).ConfigureAwait(false);
             var peer = ssl.RemoteCertificate is null ? null : new X509Certificate2(ssl.RemoteCertificate);
-            if (ssl.SslProtocol != SslProtocols.Tls13 || peer is null
+            if (!TlsPolicy.IsAcceptable(ssl, allowTls12) || peer is null
                 || (pin is not null && !Kdf.FixedTimeEquals(Fingerprint.Of(peer), pin)))
             {
                 peer?.Dispose();

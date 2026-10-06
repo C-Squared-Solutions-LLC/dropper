@@ -34,7 +34,7 @@ public class PcToPcTests
 
         string? hostSas = null, joinerSas = null;
         host.Engine.PairingRequested += r => { hostSas = r.Sas; r.Approve(); };
-        var outcome = await joiner.Engine.PairWithPcAsync(target.Endpoint, sas => { joinerSas = sas; return Task.FromResult(true); });
+        var outcome = await joiner.Engine.PairWithPcAsync(target.Endpoint, code => { joinerSas = code.Sas; Assert.False(code.LegacyTls); return Task.FromResult(true); });
 
         Assert.True(outcome.Success, outcome.Message);
         Assert.NotNull(hostSas);

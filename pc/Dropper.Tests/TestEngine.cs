@@ -17,7 +17,7 @@ internal sealed class TestEngine : IAsyncDisposable
     public int DiscoveryPort { get; }
     private readonly string _keyName = "DropperTest-PC-" + Guid.NewGuid().ToString("N");
 
-    private TestEngine(int? peerDiscoveryPort, string pcName)
+    private TestEngine(int? peerDiscoveryPort, string pcName, bool windows10)
     {
         Root = Path.Combine(Path.GetTempPath(), "dropper-test-" + Guid.NewGuid().ToString("N"));
         ReceiveDir = Path.Combine(Root, "received");
@@ -35,12 +35,13 @@ internal sealed class TestEngine : IAsyncDisposable
             ReceiveFolderOverride = ReceiveDir,
             PeerDiscoveryPort = peerDiscoveryPort ?? Wire.DiscoveryPort,
             PcName = pcName,
+            SimulateNoTls13 = windows10,
         });
     }
 
-    public static async Task<TestEngine> StartAsync(int? peerDiscoveryPort = null, string pcName = "TEST-PC")
+    public static async Task<TestEngine> StartAsync(int? peerDiscoveryPort = null, string pcName = "TEST-PC", bool windows10 = false)
     {
-        var t = new TestEngine(peerDiscoveryPort, pcName);
+        var t = new TestEngine(peerDiscoveryPort, pcName, windows10);
         await t.Engine.StartAsync();
         Assert.True(t.Engine.IsListening, t.Engine.NetworkError);
         return t;

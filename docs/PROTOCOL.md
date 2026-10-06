@@ -125,8 +125,9 @@ entries.
 
 ### 6.2 TLS
 
-- TLS **1.3 only**. No session resumption, so every connection is a full
-  handshake (PC: `AllowTlsResume = false`; phone: new `SSLContext` per connection).
+- TLS **1.3 only**, with one exception: TLS 1.2 for a Windows 10 PC (§6.2.1).
+  No session resumption, so every connection is a full handshake (PC:
+  `AllowTlsResume = false`; phone: new `SSLContext` per connection).
 - The PC is the TLS server and presents its identity certificate. It **requires**
   a client certificate.
 - The phone is the TLS client and presents its Keystore key and certificate.
@@ -143,6 +144,34 @@ entries.
 - A PC acting as client (a joiner) checks the host's leaf `fp` against the pin
   it stored, exactly as a phone does. It uses no revocation or AIA downloads.
 - Handshake timeout: 10 s.
+
+#### 6.2.1 TLS 1.2 for Windows 10, by consent only
+
+Windows 10's SChannel has no TLS 1.3, so a Windows 10 PC can't talk to anything
+that insists on it. Dropper allows TLS 1.2 in exactly these places:
+
+- **A mode-3 pairing connection** (§8.4). Both PCs offer TLS 1.2 next to 1.3,
+  and a Windows 11 pair still negotiates 1.3. If the result is TLS 1.2, each PC
+  tells its user and needs an explicit "Allow TLS 1.2 for this PC". An approval
+  without that consent counts as a rejection, on either side. The pairing then
+  stores `tls12_allowed = true` on that device record, on both PCs.
+- **Mode-1 sessions with such a device.** The server learns which device is
+  connecting from the preamble, before TLS. It offers TLS 1.2 only when that
+  device's record has `tls12_allowed`. The client does the same for its outbound
+  peer. Every other device, every phone and every stranger is offered TLS 1.3 only.
+
+Mode 2 (QR pairing with a phone) is TLS 1.3 only, so a Windows 10 PC can't pair
+a phone and says so instead of showing a code. If a PC can't offer anything for
+a connection (Windows 10 and no consent), it closes without a handshake. It never
+falls back to the OS default protocol list.
+
+After every handshake, both sides check the result: TLS 1.3, or TLS 1.2 with a
+consenting device record and one of `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256`,
+`TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384` or
+`TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256`. Anything else is closed.
+Renegotiation is disabled. The cost of TLS 1.2: the certificates travel in the
+clear, so a LAN observer learns which two public keys talk. Content, the device
+secret and the key pins are protected as with TLS 1.3.
 
 ### 6.3 After the handshake
 
@@ -292,8 +321,8 @@ All nonces are 32 random bytes, sent as base64url without padding. `fp_host` and
 8. The host waits ≤ 120 s for **both** its own user's decision and the joiner's
    `SAS_CONFIRM`. It stops at the first "no". A hang-up or a malformed frame
    counts as "no".
-   - Both yes: generate `device_secret`, store the joiner as a device of kind
-     `pc`, and send `PAIR_OK {"v":1,"name":"DESKTOP-HOST","secret":"<b64u>"}`.
+   - Both yes (and, over TLS 1.2, both users allowed TLS 1.2, §6.2.1): generate
+     `device_secret`, store the joiner as a device of kind `pc`, and send `PAIR_OK {"v":1,"name":"DESKTOP-HOST","secret":"<b64u>"}`.
    - Otherwise: `PAIR_FAIL {"error":"rejected" | "timeout"}`.
 9. On `PAIR_OK` the joiner stores the host as an **outbound** peer:
    `{fp_host, cert DER, name, device_secret (encrypted), last address}`. It then

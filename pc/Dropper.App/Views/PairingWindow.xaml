@@ -92,6 +92,16 @@
             <TextBlock Style="{StaticResource BodyText}" Margin="0,16,0,0"
                        x:Name="ApproveHint" Text="Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject."/>
             <TextBlock x:Name="ApproveDetails" Style="{StaticResource CaptionText}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            <!-- Only for a PC that can't do TLS 1.3 (Windows 10): the user has to allow TLS 1.2 explicitly. -->
+            <Border x:Name="LegacyTlsPanel" CornerRadius="10" Background="{DynamicResource DangerSoftBrush}" Padding="14,12" Margin="0,14,0,0" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource BodyText}" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" Text="Older encryption (TLS 1.2)"/>
+                    <TextBlock x:Name="LegacyTlsText" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,10"
+                               Text="One of these PCs runs Windows 10, which can't use TLS 1.3. Dropper can use TLS 1.2 for this PC only: still encrypted, with both keys pinned, but older, and the two PCs' certificates are visible to others on your network."/>
+                    <CheckBox x:Name="LegacyTlsCheck" Style="{StaticResource ToggleSwitch}" Click="LegacyTls_Click"
+                              Content="Allow TLS 1.2 for this PC" AutomationProperties.Name="Allow TLS 1.2 for this PC"/>
+                </StackPanel>
+            </Border>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
                 <Button x:Name="RejectButton" Style="{StaticResource SecondaryButton}" Content="Reject" MinWidth="96" Click="Reject_Click"/>
                 <Button x:Name="ApproveButton" Style="{StaticResource AccentButton}" Content="Codes match · Approve" Margin="10,0,0,0" Click="Approve_Click"/>

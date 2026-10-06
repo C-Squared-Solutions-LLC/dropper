@@ -21,6 +21,7 @@ public partial class PairingWindow : Window
     private DateTimeOffset? _pcHostUntil;
     private TaskCompletionSource<bool>? _joinerConfirm;
     private CancellationTokenSource? _joinerCts;
+    private bool _legacyTls;
 
     internal PairingWindow(App app)
     {
@@ -31,6 +32,14 @@ public partial class PairingWindow : Window
         PcFingerprint.Text = Fingerprint.Display(app.Engine.Identity.Fingerprint);
         _timer.Tick += (_, _) => UpdateExpiry();
         Closing += OnClosing;
+        if (!app.Engine.Tls13Available)
+        {
+            // Windows 10: phones need TLS 1.3, so only PC-to-PC pairing is possible.
+            PhoneMode.IsEnabled = false;
+            PhoneMode.ToolTip = "Pairing a phone needs Windows 11 (phones use TLS 1.3 only).";
+            PcMode.IsChecked = true; // Mode_Checked shows the PC panel
+            return;
+        }
         NewTicket(); // throws InvalidOperationException when there is no LAN; the caller reports it
     }
 
@@ -98,13 +107,16 @@ public partial class PairingWindow : Window
         ApproveHint.Text = request.IsPc
             ? "Approve only if the other PC shows exactly this code and you approve there too. If the codes differ, reject."
             : "Approve only if your phone shows exactly this code. If it doesn't, someone else may be trying to pair: reject.";
-        ApproveButton.IsEnabled = RejectButton.IsEnabled = true;
+        ShowLegacyTls(request.LegacyTls);
+        RejectButton.IsEnabled = true;
         Show(ApprovePanel);
         Activate();
         request.Abandoned.Register(() => Dispatcher.BeginInvoke(() =>
         {
             if (_pending == request && !_finished)
-                ShowResult(false, "Pairing cancelled", "The phone stopped waiting. Make a new code to try again.");
+                ShowResult(false, "Pairing cancelled", request.IsPc
+                    ? "The other PC stopped waiting. Try again when both PCs are ready."
+                    : "The phone stopped waiting. Make a new code to try again.");
         }));
     }
 
@@ -132,9 +144,22 @@ public partial class PairingWindow : Window
     private void Approve_Click(object sender, RoutedEventArgs e)
     {
         ApproveButton.IsEnabled = RejectButton.IsEnabled = false;
-        if (_joinerConfirm is { } c) c.TrySetResult(true);
-        else _pending?.Approve();
+        bool allowTls12 = _legacyTls && LegacyTlsCheck.IsChecked == true;
+        if (_joinerConfirm is { } c) c.TrySetResult(!_legacyTls || allowTls12);
+        else _pending?.Approve(allowTls12);
     }
+
+    /// <summary>TLS 1.2 is never implied: Approve stays disabled until the user allows it.</summary>
+    private void ShowLegacyTls(bool legacy)
+    {
+        _legacyTls = legacy;
+        LegacyTlsCheck.IsChecked = false;
+        LegacyTlsPanel.Visibility = legacy ? Visibility.Visible : Visibility.Collapsed;
+        ApproveButton.IsEnabled = !legacy;
+    }
+
+    private void LegacyTls_Click(object sender, RoutedEventArgs e) =>
+        ApproveButton.IsEnabled = RejectButton.IsEnabled && LegacyTlsCheck.IsChecked == true;
 
     private void Reject_Click(object sender, RoutedEventArgs e)
     {
@@ -242,21 +267,22 @@ public partial class PairingWindow : Window
         _joinerCts = new CancellationTokenSource();
         FindStatus.Text = $"Connecting to {pc.Name}…";
         var outcome = await _app.Engine.PairWithPcAsync(pc.Endpoint,
-            sas => Dispatcher.Invoke(() => AskJoinerToConfirm(pc, sas)), _joinerCts.Token);
+            code => Dispatcher.Invoke(() => AskJoinerToConfirm(pc, code)), _joinerCts.Token);
         _joinerConfirm = null;
         if (!IsLoaded) return;
         ShowOutcome(outcome);
     }
 
     /// <summary>Joiner side: show the 6-digit code and wait for the user's answer.</summary>
-    private Task<bool> AskJoinerToConfirm(DiscoveredPc pc, string sas)
+    private Task<bool> AskJoinerToConfirm(DiscoveredPc pc, PcPairingCode code)
     {
         _joinerConfirm = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         ApproveDeviceText.Text = $"Pairing with “{pc.Name}” ({pc.Endpoint.Address}).";
-        SasText.Text = sas;
+        SasText.Text = code.Sas;
         ApproveDetails.Text = "Approve here and on the other PC.";
         ApproveHint.Text = "Approve only if the other PC shows exactly this code. If the codes differ, reject.";
-        ApproveButton.IsEnabled = RejectButton.IsEnabled = true;
+        RejectButton.IsEnabled = true;
+        ShowLegacyTls(code.LegacyTls);
         Show(ApprovePanel);
         Activate();
         return _joinerConfirm.Task;

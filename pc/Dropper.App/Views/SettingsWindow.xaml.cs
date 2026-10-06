@@ -75,6 +75,14 @@ public partial class SettingsWindow : Window
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0),
             });
             info.Children.Add(new TextBlock { Style = (Style)FindResource("MonoText"), Text = d.FingerprintDisplay, Margin = new Thickness(0, 4, 0, 0) });
+            if (d.Tls12Allowed)
+                info.Children.Add(new TextBlock
+                {
+                    Style = (Style)FindResource("CaptionText"),
+                    Foreground = (System.Windows.Media.Brush)FindResource("WarningBrush"),
+                    Text = "TLS 1.2 allowed (that PC runs Windows 10). Remove and pair again to revoke.",
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
+                });
             Grid.SetColumn(info, 1);
             grid.Children.Add(info);
 

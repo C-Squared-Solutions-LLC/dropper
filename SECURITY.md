@@ -43,7 +43,7 @@ Please don't open a public issue for security problems.
 | Purpose | Mechanism |
 |---|---|
 | Device identity | ECDSA P-256 key pair. Fingerprint = SHA-256 of the SubjectPublicKeyInfo. |
-| Transport | TLS 1.3 only (AES-GCM / ChaCha20-Poly1305, ECDHE so every session has forward secrecy). Mutual certificate authentication with exact public-key pinning. Session resumption disabled, so every connection is a full handshake. |
+| Transport | TLS 1.3 (AES-GCM / ChaCha20-Poly1305, ECDHE so every session has forward secrecy). TLS 1.2 only for a Windows 10 PC whose pairing both users explicitly allowed it, and then only ECDHE-ECDSA with AES-GCM or ChaCha20. Mutual certificate authentication with exact public-key pinning. Session resumption disabled, so every connection is a full handshake. |
 | Pairing | 256-bit one-time secret inside the QR code, with keys derived by HKDF-SHA256. An HMAC proof binds the secret to *both* TLS public keys. A 6-digit SAS (short authentication string) is compared by the user. |
 | PC-to-PC pairing | Numeric comparison with a commitment, as in Bluetooth Secure Simple Pairing. The host sends `SHA-256(Na ‖ fp_host ‖ fp_joiner)` before it sees the joiner's `Nb`. The 6-digit code is HMAC'd from `HKDF(Na ‖ Nb)` over both TLS fingerprints, and both users must approve. |
 | Pre-TLS gate | HMAC-SHA256 under a per-device key (HKDF from a 256-bit secret created when you approve pairing), plus timestamp and nonce. |
@@ -80,6 +80,14 @@ constant-time.
   Only one attempt runs at a time. The per-IP throttle and the pre-auth limits
   still apply, and nothing gets stored without both approvals. Outside that
   window, mode 3 is refused before TLS, like any other bad preamble.
+- **TLS 1.2 only by consent.** Windows 10 has no TLS 1.3. Rather than lower the
+  bar for everyone, Dropper offers TLS 1.2 to a device only if the users of
+  *both* PCs ticked "Allow TLS 1.2 for this PC" while pairing it, and it stores
+  that per device. Phones and every other device stay TLS 1.3 only, and a
+  Windows 10 PC can't pair a phone. With these settings, TLS 1.2 still has
+  forward secrecy and authenticated encryption, and pinning is unchanged. What
+  you lose is privacy of the certificates: someone on the LAN can see which two
+  keys are talking. Revoke it by removing the device.
 - **Minimal dependencies.** The Windows app uses only the .NET base library plus
   QRCoder (to draw the QR code). The Android app uses AndroidX, Jetpack Compose
   and ZXing (to read the QR code). Neither app uses third-party networking or

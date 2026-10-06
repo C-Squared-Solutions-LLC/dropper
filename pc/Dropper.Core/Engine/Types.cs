@@ -19,6 +19,8 @@ public sealed class EngineOptions
     public int DiscoveryPort { get; init; } = Wire.DiscoveryPort;
     /// <summary>UDP port other PCs answer discovery on (tests run several engines on one machine).</summary>
     public int PeerDiscoveryPort { get; init; } = Wire.DiscoveryPort;
+    /// <summary>Tests only: behave like Windows 10, which has no TLS 1.3.</summary>
+    public bool SimulateNoTls13 { get; init; }
     /// <summary>Tests only: bind discovery to loopback instead of all interfaces.</summary>
     public IPAddress DiscoveryBindAddress { get; init; } = IPAddress.Any;
     public bool EnableDiscovery { get; init; } = true;
@@ -53,7 +55,8 @@ public sealed record DeviceStatus(
     DateTimeOffset? LastSeen,
     DateTimeOffset PairedAt,
     string FingerprintDisplay,
-    string Kind = "phone");
+    string Kind = "phone",
+    bool Tls12Allowed = false);
 
 /// <summary>An open pairing window: the secret behind one QR code.</summary>
 public sealed class PairingTicket
@@ -85,7 +88,8 @@ public sealed class PairingRequest
     private readonly TaskCompletionSource<bool> _decision = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _abandoned = new();
 
-    internal PairingRequest(string deviceName, string model, string sas, string fingerprint, IPAddress from, bool isPc = false)
+    internal PairingRequest(string deviceName, string model, string sas, string fingerprint, IPAddress from,
+        bool isPc = false, bool legacyTls = false)
     {
         DeviceName = deviceName;
         Model = model;
@@ -93,6 +97,7 @@ public sealed class PairingRequest
         Fingerprint = fingerprint;
         From = from;
         IsPc = isPc;
+        LegacyTls = legacyTls;
     }
 
     public string DeviceName { get; }
@@ -103,11 +108,16 @@ public sealed class PairingRequest
     public IPAddress From { get; }
     /// <summary>True when another Dropper PC is asking; both sides compare the code.</summary>
     public bool IsPc { get; }
+    /// <summary>
+    /// The other PC can only do TLS 1.2 (Windows 10). Approving then also has to allow TLS 1.2
+    /// for that PC, explicitly: <see cref="Approve(bool)"/> with true, or it counts as a rejection.
+    /// </summary>
+    public bool LegacyTls { get; }
 
     /// <summary>Fires if the phone disconnects or the approval times out, so the UI can close its prompt.</summary>
     public CancellationToken Abandoned => _abandoned.Token;
 
-    public void Approve() => _decision.TrySetResult(true);
+    public void Approve(bool allowLegacyTls = false) => _decision.TrySetResult(!LegacyTls || allowLegacyTls);
     public void Reject() => _decision.TrySetResult(false);
 
     internal Task<bool> Decision => _decision.Task;
@@ -118,6 +128,9 @@ public sealed class PairingRequest
         try { _abandoned.Cancel(); } catch (ObjectDisposedException) { }
     }
 }
+
+/// <summary>What the joiner's user is asked to confirm: the code, and whether TLS 1.2 would be needed.</summary>
+public sealed record PcPairingCode(string Sas, bool LegacyTls);
 
 public sealed record PairingOutcome(bool Success, string Message, string? DeviceName);
 

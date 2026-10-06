@@ -39,6 +39,10 @@ Each release lists SHA-256 checksums. Check them before installing.
 
 ### Windows 10/11
 
+Windows 11 does everything. On Windows 10, Dropper can pair only with other PCs,
+over TLS 1.2 with your consent on both PCs. It can't pair a phone, because phones
+require TLS 1.3, which Windows 10 doesn't have.
+
 1. Install the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) if you don't have it:
    `winget install Microsoft.DotNet.DesktopRuntime.8`
 2. Unzip the release and run, in that folder:
@@ -94,6 +98,9 @@ The short version:
   before it sees the other's, so someone in the middle can't pick values that
   make the two codes match. Both users must approve.
 - **TLS 1.3, both ways pinned.** Each side accepts only the key it paired with.
+  Windows 10 has no TLS 1.3, so a Windows 10 PC can pair with another PC over
+  TLS 1.2, but only if you tick *Allow TLS 1.2 for this PC* on **both** PCs. It
+  can't pair a phone.
 - **Hardware keys.** The PC's identity key lives in the TPM; the phone's in the
   Android Keystore (TEE). Neither can be exported.
 - **Silent to strangers.** A connection has to open with an HMAC "knock" that only

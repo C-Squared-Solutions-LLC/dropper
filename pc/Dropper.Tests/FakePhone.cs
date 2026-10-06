@@ -105,6 +105,9 @@ internal sealed class FakePhone : IDisposable
         }
     }
 
+    /// <summary>What the fake phone offers in TLS. Real phones offer TLS 1.3 only.</summary>
+    public SslProtocols Protocols { get; set; } = SslProtocols.Tls13;
+
     public Task<Connection> ConnectSessionAsync() =>
         ConnectAsync(Wire.ModeSession, Kdf.Hkdf32(DeviceSecret!, Kdf.GateInfo));
 
@@ -126,7 +129,7 @@ internal sealed class FakePhone : IDisposable
             await ssl.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
             {
                 TargetHost = "dropper",
-                EnabledSslProtocols = SslProtocols.Tls13,
+                EnabledSslProtocols = Protocols,
                 ClientCertificates = new X509CertificateCollection { cert },
                 LocalCertificateSelectionCallback = (_, _, _, _, _) => cert,
                 CertificateRevocationCheckMode = X509RevocationMode.NoCheck,

@@ -314,14 +314,14 @@ public sealed partial class DropperEngine : IAsyncDisposable
                     _sessions.TryGetValue(d.FpHex, out var s);
                     return new DeviceStatus(d.FpHex, d.Record.Name, d.Record.Model,
                         s?.PeerHello is not null, s?.Remote.Address.ToString(), d.Record.LastSeen,
-                        d.Record.PairedAt, Fingerprint.Display(d.Fp), d.Record.Kind);
+                        d.Record.PairedAt, Fingerprint.Display(d.Fp), d.Record.Kind, d.Record.Tls12Allowed);
                 })
                 .ToList();
         }
     }
 
     internal PairedDevice AddDevice(X509Certificate2 cert, byte[] fp, string name, string model, byte[] deviceSecret,
-        string kind = "phone", bool outbound = false, IEnumerable<string>? addresses = null)
+        string kind = "phone", bool outbound = false, IEnumerable<string>? addresses = null, bool tls12Allowed = false)
     {
         string fpHex = Fingerprint.Hex(fp);
         var rec = new DeviceRecord
@@ -335,6 +335,7 @@ public sealed partial class DropperEngine : IAsyncDisposable
             Kind = kind,
             Outbound = outbound,
             Addresses = addresses?.ToList() ?? new(),
+            Tls12Allowed = tls12Allowed,
         };
         PairedDevice added;
         List<Session> replaced = new();
@@ -412,8 +413,14 @@ public sealed partial class DropperEngine : IAsyncDisposable
     }
 
     /// <summary>Opens a 3-minute, single-use pairing window and returns the QR payload.</summary>
+    /// <summary>False on Windows 10, whose SChannel has no TLS 1.3.</summary>
+    public bool Tls13Available => TlsPolicy.OsHasTls13 && !_options.SimulateNoTls13;
+
     public PairingTicket StartPairing()
     {
+        // Phones only speak TLS 1.3, which Windows 10 doesn't have.
+        if (!Tls13Available)
+            throw new InvalidOperationException("Pairing a phone needs Windows 11: phones use TLS 1.3 only, and Windows 10 doesn't support it. You can still pair this PC with another PC.");
         var endpoints = AdvertisedEndpoints();
         if (endpoints.Count == 0) throw new InvalidOperationException(NetworkError ?? "Not connected to a local network.");
         byte[] secret = RandomNumberGenerator.GetBytes(32);
